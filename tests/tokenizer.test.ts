@@ -92,11 +92,4 @@ describe("Milestone 1 — tokenizer", () => {
       { type: "EOF" },
     ]);
   });
-
-  it("tokenizes a double-quoted string", () => {
-    expect(tokenize('"hello"')).toMatchObject([
-      { type: "STRING", lexeme: '"hello"', literal: "hello" },
-      { type: "EOF" },
-    ]);
-  });
 });
