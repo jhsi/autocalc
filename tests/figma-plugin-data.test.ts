@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  assignStableCellIds,
   cellIdFromLayerName,
+  isGenericLayerId,
   isHintNode,
   isOverlayNode,
+  isValidCellId,
   normalizeFormula,
   parseCharactersAsValue,
   parseLiteralInput,
   parseStoredCell,
   serializeStoredCell,
-  uniqueCellIds,
 } from "../src/figma/plugin-data.ts";
 
 describe("Figma pluginData", () => {
@@ -51,19 +53,22 @@ describe("Figma pluginData", () => {
     expect(normalizeFormula("  ")).toBeUndefined();
   });
 
-  it("uniquifies colliding layer names so every text layer can be referenced", () => {
-    const ids = uniqueCellIds([
-      { nodeId: "1", layerName: "Text" },
-      { nodeId: "2", layerName: "100" },
-      { nodeId: "3", layerName: "Text" },
-      { nodeId: "4", layerName: "Text" },
-      { nodeId: "5", storedId: "price", layerName: "Text" },
+  it("assigns compact cN ids that do not follow layer content", () => {
+    const ids = assignStableCellIds([
+      { nodeId: "1" },
+      { nodeId: "2", storedId: "price" },
+      { nodeId: "3", suggestedId: "Text" },
+      { nodeId: "4", suggestedId: "c100" },
+      { nodeId: "5", suggestedId: "qty" },
     ]);
-    expect(ids.get("1")).toBe("Text");
-    expect(ids.get("2")).toBe("c100");
-    expect(ids.get("3")).toBe("Text_2");
-    expect(ids.get("4")).toBe("Text_3");
-    expect(ids.get("5")).toBe("price");
+    expect(ids.get("1")).toBe("c1");
+    expect(ids.get("2")).toBe("price");
+    expect(ids.get("3")).toBe("c2");
+    expect(ids.get("4")).toBe("c3");
+    expect(ids.get("5")).toBe("qty");
+    expect(isValidCellId("c1")).toBe(true);
+    expect(isGenericLayerId("Text")).toBe(true);
+    expect(isGenericLayerId("c100")).toBe(true);
   });
 
   it("treats hint overlays as overlay nodes", () => {

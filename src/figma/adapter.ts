@@ -4,12 +4,13 @@ import type { DocumentAdapter } from "../adapters/document-adapter.ts";
 import type { Cell, CellFormat, CellId, CellValue } from "../core/types.ts";
 import {
   PLUGIN_DATA_KEY,
+  assignStableCellIds,
   cellIdFromLayerName,
+  isGenericLayerId,
   isOverlayNode,
   parseCharactersAsValue,
   parseStoredCell,
   serializeStoredCell,
-  uniqueCellIds,
   type StoredCell,
 } from "./plugin-data.ts";
 
@@ -70,24 +71,36 @@ export class FigmaDocumentAdapter implements DocumentAdapter {
   cellFromNode(node: TextNode): Cell {
     const stored = this.readStored(node);
     const id = this.idOf(node);
+    const fromCanvas = parseCharactersAsValue(node.characters);
     if (stored) {
       return {
         id,
         name: node.name,
         formula: stored.formula,
-        rawValue: stored.formula !== undefined ? undefined : stored.rawValue,
+        rawValue:
+          stored.formula !== undefined
+            ? undefined
+            : (stored.rawValue !== undefined ? stored.rawValue : fromCanvas),
         format: stored.format,
       };
     }
     return {
       id,
       name: node.name,
-      rawValue: parseCharactersAsValue(node.characters),
+      rawValue: fromCanvas,
     };
   }
 
   isManaged(node: TextNode): boolean {
-    return this.readStored(node) !== undefined;
+    const stored = this.readStored(node);
+    if (!stored) {
+      return false;
+    }
+    return (
+      stored.formula !== undefined ||
+      stored.rawValue !== undefined ||
+      stored.format !== undefined
+    );
   }
 
   managedTextNodes(): TextNode[] {
@@ -104,20 +117,36 @@ export class FigmaDocumentAdapter implements DocumentAdapter {
   }
 
   private idOf(node: TextNode): string {
-    return this.ensureCellIds().get(node.id) ?? cellIdFromLayerName(node.name);
+    return this.ensureCellIds().get(node.id) ?? "c1";
   }
 
   private ensureCellIds(): Map<string, string> {
     if (!this.cellIdMap) {
-      this.cellIdMap = uniqueCellIds(
-        this.allTextNodes().map((node) => ({
+      const nodes = this.allTextNodes();
+      this.cellIdMap = assignStableCellIds(
+        nodes.map((node) => ({
           nodeId: node.id,
           storedId: this.readStored(node)?.cellId,
-          layerName: node.name,
+          suggestedId: suggestedIdForNode(node),
         })),
       );
+      this.persistAssignedIds(nodes, this.cellIdMap);
     }
     return this.cellIdMap;
+  }
+
+  private persistAssignedIds(nodes: TextNode[], map: Map<string, string>): void {
+    for (const node of nodes) {
+      const id = map.get(node.id);
+      if (!id) {
+        continue;
+      }
+      const stored = this.readStored(node);
+      if (stored?.cellId === id) {
+        continue;
+      }
+      this.writeStored(node, stored ? { ...stored, cellId: id } : { cellId: id });
+    }
   }
 
   private requireTextNode(id: CellId): TextNode {
@@ -145,4 +174,12 @@ export class FigmaDocumentAdapter implements DocumentAdapter {
   private freshStored(cellId: string): StoredCell {
     return { cellId };
   }
+}
+
+function suggestedIdForNode(node: TextNode): string | undefined {
+  if (node.autoRename) {
+    return undefined;
+  }
+  const id = cellIdFromLayerName(node.name);
+  return isGenericLayerId(id) ? undefined : id;
 }

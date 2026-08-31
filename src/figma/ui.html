@@ -11,15 +11,19 @@
       }
       body {
         margin: 0;
-        font: 11px/1.4 Inter, system-ui, sans-serif;
+        font: 12px/1.4 Inter, system-ui, sans-serif;
         background: var(--figma-color-bg);
         color: var(--figma-color-text);
       }
+      html,
+      body {
+        overflow: hidden;
+      }
       .wrap {
-        padding: 12px;
+        padding: 12px 16px 16px 16px;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 14px;
       }
       .muted {
         color: var(--figma-color-text-secondary);
@@ -28,8 +32,8 @@
       .field {
         display: flex;
         flex-direction: column;
-        gap: 4px;
-        font-weight: 600;
+        gap: 8px;
+        font-weight: 400;
       }
       .expr-head {
         display: flex;
@@ -39,15 +43,13 @@
         min-height: 18px;
       }
       .expr-label {
-        font-weight: 600;
+        font-weight: 400;
       }
       .expr-label .mode-on {
         color: var(--figma-color-text);
-        font-weight: 700;
       }
       .expr-label .mode-off {
         color: var(--figma-color-text-secondary);
-        font-weight: 500;
       }
       input,
       select {
@@ -74,18 +76,18 @@
         flex-wrap: wrap;
         align-items: flex-start;
         align-content: flex-start;
-        gap: 6px;
+        gap: 4px 0;
         cursor: text;
         width: 100%;
       }
       .clear-expr {
         height: auto;
-        padding: 0;
+        padding: 0 2px 0 0;
         border: 0;
         border-radius: 0;
         background: transparent;
         color: var(--figma-color-text-secondary);
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 500;
         line-height: 1.4;
         flex-shrink: 0;
@@ -116,6 +118,7 @@
         line-height: 24px;
         color: var(--figma-color-bg-brand);
         padding: 0 2px 0 2px;
+        cursor: text;
       }
       #formulaTokens {
         display: contents;
@@ -159,7 +162,25 @@
         font-weight: 600;
         font-size: 13px;
         line-height: 24px;
-        padding: 0 1px;
+        padding: 0 4px;
+        cursor: text;
+        user-select: none;
+        border-radius: 4px;
+      }
+      .op:hover {
+        background: var(--figma-color-bg-tertiary, rgba(0, 0, 0, 0.06));
+      }
+      .slot {
+        width: 10px;
+        min-height: 24px;
+        flex-shrink: 0;
+        cursor: text;
+        border-radius: 2px;
+        align-self: stretch;
+      }
+      .slot:hover {
+        background: var(--figma-color-bg-brand);
+        opacity: 0.28;
       }
       #exprDraft {
         flex: 1 1 80px;
@@ -172,10 +193,29 @@
         box-shadow: none;
         font-size: 12px;
       }
+      #exprDraft.is-mid {
+        flex: 0 0 auto;
+        min-width: 2px;
+        width: 2px;
+        min-height: 18px;
+        margin: 3px 2px 0;
+        background: var(--figma-color-bg-brand);
+        border-radius: 1px;
+        caret-color: transparent;
+      }
+      #exprDraft.is-mid:not(:placeholder-shown) {
+        min-width: 24px;
+        width: auto;
+        height: 24px;
+        margin: 0 2px;
+        background: transparent;
+        caret-color: var(--figma-color-text);
+      }
       .format-row {
         display: grid;
         grid-template-columns: 2fr 1fr;
         gap: 8px;
+        margin-top: 4px;
       }
       #fractionDigits.is-auto,
       #fractionDigits:placeholder-shown {
@@ -196,14 +236,13 @@
         color: var(--figma-color-text-danger);
       }
       .more {
-        border-top: 1px solid var(--figma-color-border);
-        padding-top: 6px;
+        padding-top: 0;
       }
       .more summary {
         cursor: pointer;
         color: var(--figma-color-text-secondary);
-        font-size: 10px;
-        font-weight: 500;
+        font-size: 12px;
+        font-weight: 400;
         list-style: none;
       }
       .more summary::-webkit-details-marker {
@@ -222,7 +261,7 @@
         margin-top: 8px;
       }
       .empty {
-        padding: 32px 20px 24px;
+        padding: 32px 16px 24px;
         text-align: center;
         color: var(--figma-color-text-secondary);
         display: flex;
@@ -285,8 +324,8 @@
           Format
           <select id="kind">
             <option value="number">Number</option>
-            <option value="currency">Currency</option>
             <option value="percent">Percent</option>
+            <option value="currency">Currency</option>
             <option value="compact">Compact</option>
           </select>
         </label>
@@ -295,8 +334,8 @@
           <input id="fractionDigits" type="number" min="0" max="8" placeholder="Auto" class="is-auto" />
         </label>
       </div>
-      <details class="more">
-        <summary>Locale &amp; currency</summary>
+      <details class="more" id="moreOptions">
+        <summary>Currency &amp; Locale</summary>
         <div class="stack">
           <label>
             Currency
@@ -383,8 +422,10 @@
       const fractionDigits = document.getElementById("fractionDigits");
       const currency = document.getElementById("currency");
       const locale = document.getElementById("locale");
+      const moreOptions = document.getElementById("moreOptions");
 
-      let canonicalFormula = "";
+      let formulaParts = [];
+      let caretIndex = 0;
       let formulaMode = false;
       let formatOnly = false;
       let blurTimer = 0;
@@ -414,6 +455,24 @@
         parent.postMessage({ pluginMessage }, "*");
       }
 
+      let lastPluginHeight = 0;
+      function formulaFieldBusy() {
+        return (
+          document.activeElement === exprDraft ||
+          exprBox.classList.contains("is-picking") ||
+          holdFormulaFocus
+        );
+      }
+
+      function resizePlugin() {
+        if (formulaFieldBusy()) return;
+        const visible = panel.hidden ? empty : panel;
+        const height = Math.min(800, Math.max(140, Math.ceil(visible.getBoundingClientRect().bottom) + 2));
+        if (height === lastPluginHeight) return;
+        lastPluginHeight = height;
+        post({ type: "resize", width: 320, height });
+      }
+
       function parseParts(source) {
         const formula = source.trim().replace(/^=/, "").trim();
         if (!formula) return [];
@@ -431,89 +490,291 @@
         return parts.map((part) => part.value).join(" ").replace(/\s+/g, " ").trim();
       }
 
+      function isBinaryOpPart(part) {
+        return Boolean(part && part.kind === "text" && /^[+\-*/,]$/.test(part.value));
+      }
+
+      function isValuePart(part) {
+        if (!part) return false;
+        if (part.kind === "ref") return true;
+        return part.value === ")" || /^\d/.test(part.value);
+      }
+
+      function removeCellRefAt(parts, index) {
+        const next = parts.slice();
+        if (index < 0 || index >= next.length || next[index].kind !== "ref") return next;
+        const refIndexes = next.map((part, i) => (part.kind === "ref" ? i : -1)).filter((i) => i >= 0);
+        const pos = refIndexes.indexOf(index);
+        const isFirst = pos === 0;
+        const isLast = pos === refIndexes.length - 1;
+        if (isFirst && !isLast && isBinaryOpPart(next[index + 1])) {
+          next.splice(index, 2);
+          return next;
+        }
+        if (!isLast && isBinaryOpPart(next[index - 1])) {
+          next.splice(index - 1, 2);
+          return next;
+        }
+        if (!isLast && isBinaryOpPart(next[index + 1])) {
+          next.splice(index, 2);
+          return next;
+        }
+        next.splice(index, 1);
+        return next;
+      }
+
+      function insertRefIntoParts(parts, index, cellId) {
+        const clamped = Math.max(0, Math.min(index, parts.length));
+        const before = parts.slice(0, clamped);
+        const after = parts.slice(clamped);
+        const prev = before[before.length - 1];
+        const nextTok = after[0];
+        const out = before.slice();
+        if (isValuePart(prev)) out.push({ kind: "text", value: "+" });
+        out.push({ kind: "ref", value: cellId });
+        const caret = out.length;
+        if (isValuePart(nextTok) || (nextTok && nextTok.value === "(")) {
+          out.push({ kind: "text", value: "+" });
+        }
+        return { parts: out.concat(after), caret };
+      }
+
+      function insertTextIntoParts(parts, index, text) {
+        const next = parts.slice();
+        const clamped = Math.max(0, Math.min(index, next.length));
+        if (/^[+\-*/]$/.test(text)) {
+          if (isBinaryOpPart(next[clamped])) {
+            next[clamped] = { kind: "text", value: text };
+            return { parts: next, caret: clamped + 1 };
+          }
+          if (clamped > 0 && isBinaryOpPart(next[clamped - 1])) {
+            next[clamped - 1] = { kind: "text", value: text };
+            return { parts: next, caret: clamped };
+          }
+        }
+        next.splice(clamped, 0, { kind: "text", value: text });
+        return { parts: next, caret: clamped + 1 };
+      }
+
       function getExpression() {
         const draft = exprDraft.value.trim();
         if (!formulaMode) return draft;
-        const body = [canonicalFormula, draft].filter(Boolean).join(" ");
+        const parts = formulaParts.slice(0, caretIndex);
+        if (draft) parts.push({ kind: "text", value: draft });
+        parts.push(...formulaParts.slice(caretIndex));
+        const body = joinParts(parts);
         return body ? `= ${body}` : "=";
       }
 
+      function expressionFilled() {
+        return getExpression().replace(/^=/, "").trim().length > 0;
+      }
+
+      function updatePlaceholder() {
+        if (expressionFilled()) {
+          exprDraft.placeholder = "";
+          return;
+        }
+        exprDraft.placeholder = formulaMode
+          ? "price * qty"
+          : "1234.56 or = to start a formula";
+      }
+
       function updateMode() {
-        formulaMode = getExpression().trim().startsWith("=") || formulaMode && canonicalFormula.length > 0;
+        formulaMode =
+          getExpression().trim().startsWith("=") ||
+          (formulaMode && formulaParts.length > 0);
         equalsMark.hidden = !formulaMode;
         exprBox.classList.toggle("is-formula", formulaMode);
         modeFormula.className = formulaMode ? "mode-on" : "mode-off";
         modeValue.className = formulaMode ? "mode-off" : "mode-on";
-        exprDraft.placeholder = formulaMode ? "price * qty" : "1234.56 or = to start a formula";
+        exprDraft.classList.toggle("is-mid", formulaMode && caretIndex < formulaParts.length);
+        updatePlaceholder();
         syncClearButton();
       }
 
-      function enterFormulaMode() {
-        formulaMode = true;
-        if (!canonicalFormula && exprDraft.value.trim().startsWith("=")) {
-          exprDraft.value = exprDraft.value.trim().replace(/^=/, "").trim();
+      function parkDraft() {
+        if (exprDraft.parentElement !== exprBox) {
+          exprBox.append(exprDraft);
         }
-        updateMode();
+      }
+
+      function setCaret(index, options = {}) {
+        caretIndex = Math.max(0, Math.min(index, formulaParts.length));
+        paintTokens();
+        if (options.focus !== false) exprDraft.focus();
       }
 
       function exitFormulaMode() {
         formulaMode = false;
-        canonicalFormula = "";
+        formulaParts = [];
+        caretIndex = 0;
+        exprDraft.remove();
         formulaTokens.replaceChildren();
+        parkDraft();
         updateMode();
       }
 
-      function renderTokens(source) {
-        canonicalFormula = source.trim().replace(/^=/, "").trim();
+      function paintTokens() {
+        if (!formulaMode) {
+          parkDraft();
+          formulaTokens.replaceChildren();
+          updateMode();
+          return;
+        }
+        const keepFocus = document.activeElement === exprDraft;
+        exprDraft.remove();
         formulaTokens.replaceChildren();
-        if (!formulaMode) return;
-        parseParts(canonicalFormula).forEach((part, index) => {
-          if (part.kind === "ref") {
-            const tag = document.createElement("span");
-            tag.className = "tag";
-            const label = document.createElement("span");
-            label.className = "tag-label";
-            label.textContent = part.value;
-            tag.append(label);
-            const remove = document.createElement("button");
-            remove.type = "button";
-            remove.className = "tag-remove";
-            remove.setAttribute("aria-label", `Remove ${part.value}`);
-            remove.textContent = "×";
-            remove.addEventListener("mousedown", (event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            });
-            remove.addEventListener("click", (event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              const next = parseParts(canonicalFormula).filter((_, i) => i !== index);
-              renderTokens(joinParts(next));
-              requestPreview({ revealError: false });
-              scheduleCommit();
-              exprDraft.focus();
-            });
-            tag.addEventListener("mousedown", (event) => {
-              if (event.target.closest(".tag-remove")) return;
-              event.preventDefault();
-              event.stopPropagation();
-            });
-            tag.addEventListener("click", (event) => {
-              if (event.target.closest(".tag-remove")) return;
-              event.preventDefault();
-              event.stopPropagation();
-              exprDraft.focus();
-            });
-            tag.append(remove);
-            formulaTokens.append(tag);
-          } else {
-            const op = document.createElement("span");
-            op.className = "op";
-            op.textContent = part.value;
-            formulaTokens.append(op);
+        for (let i = 0; i <= formulaParts.length; i++) {
+          if (i === caretIndex) formulaTokens.append(exprDraft);
+          else formulaTokens.append(makeSlot(i));
+          if (i < formulaParts.length) {
+            const part = formulaParts[i];
+            formulaTokens.append(part.kind === "ref" ? makeTag(part, i) : makeOp(part, i));
           }
-        });
+        }
         updateMode();
+        if (keepFocus) exprDraft.focus();
+      }
+
+      function makeSlot(index) {
+        const slot = document.createElement("span");
+        slot.className = "slot";
+        slot.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          flushDraft();
+          setCaret(index);
+        });
+        return slot;
+      }
+
+      function makeOp(part, index) {
+        const op = document.createElement("span");
+        op.className = "op";
+        op.textContent = part.value;
+        op.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          flushDraft();
+          setCaret(index + 1);
+        });
+        return op;
+      }
+
+      function makeTag(part, index) {
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        const label = document.createElement("span");
+        label.className = "tag-label";
+        label.textContent = part.value;
+        tag.append(label);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "tag-remove";
+        remove.setAttribute("aria-label", `Remove ${part.value}`);
+        remove.textContent = "×";
+        remove.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        remove.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          formulaParts = removeCellRefAt(formulaParts, index);
+          caretIndex = Math.min(index, formulaParts.length);
+          paintTokens();
+          requestPreview({ revealError: false });
+          exprDraft.focus();
+        });
+        tag.addEventListener("mousedown", (event) => {
+          if (event.target.closest(".tag-remove")) return;
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        tag.addEventListener("click", (event) => {
+          if (event.target.closest(".tag-remove")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setCaret(index + 1);
+        });
+        tag.append(remove);
+        return tag;
+      }
+
+      function renderTokens(source, caret) {
+        formulaParts = parseParts(source);
+        caretIndex = caret == null ? formulaParts.length : Math.min(caret, formulaParts.length);
+        formulaMode = true;
+        paintTokens();
+      }
+
+      function flushDraft() {
+        const draft = exprDraft.value.trim();
+        if (!draft || !formulaMode) return;
+        const flushed = parseParts(draft);
+        if (flushed.length === 0) {
+          formulaParts.splice(caretIndex, 0, { kind: "text", value: draft });
+          caretIndex += 1;
+        } else {
+          formulaParts.splice(caretIndex, 0, ...flushed);
+          caretIndex += flushed.length;
+        }
+        exprDraft.value = "";
+      }
+
+      function insertRefAtCaret(cellId) {
+        const inserted = insertRefIntoParts(formulaParts, caretIndex, cellId);
+        formulaParts = inserted.parts;
+        caretIndex = inserted.caret;
+        exprDraft.value = "";
+        formulaMode = true;
+        paintTokens();
+      }
+
+      function insertTokenAtCaret(text) {
+        flushDraft();
+        const inserted = insertTextIntoParts(formulaParts, caretIndex, text);
+        formulaParts = inserted.parts;
+        caretIndex = inserted.caret;
+        paintTokens();
+      }
+
+      function isCellIdDraft(text) {
+        return /^[A-Za-z][A-Za-z0-9_]*$/.test(text) && !FN.has(text);
+      }
+
+      function commitDraftAsTokens(draft) {
+        if (isCellIdDraft(draft)) {
+          insertRefAtCaret(draft);
+          return;
+        }
+        exprDraft.value = draft;
+        flushDraft();
+        paintTokens();
+      }
+
+      function consumeLeadingOps() {
+        const value = exprDraft.value;
+        let i = 0;
+        while (i < value.length && "+-*/(),".includes(value[i])) i += 1;
+        if (i === 0) return;
+        const ops = value.slice(0, i);
+        exprDraft.value = value.slice(i);
+        for (const ch of ops) {
+          const inserted = insertTextIntoParts(formulaParts, caretIndex, ch);
+          formulaParts = inserted.parts;
+          caretIndex = inserted.caret;
+        }
+        paintTokens();
+      }
+
+      function commitSpacedDraft() {
+        const value = exprDraft.value;
+        if (!/\s/.test(value)) return;
+        const draft = value.trim();
+        exprDraft.value = "";
+        if (draft) commitDraftAsTokens(draft);
       }
 
       function ensureSelectValue(select, value) {
@@ -557,7 +818,16 @@
         post({ type: "preview", ...payload(), ...options });
       }
 
-      function scheduleCommit() {
+      function commitFormula() {
+        window.clearTimeout(commitTimer);
+        if (formatOnly) {
+          post({ type: "apply-format", format: currentFormat(), silent: true });
+          return;
+        }
+        requestPreview({ commit: true, revealError: true, silent: true });
+      }
+
+      function scheduleFormatCommit() {
         window.clearTimeout(commitTimer);
         commitTimer = window.setTimeout(() => {
           if (formatOnly) {
@@ -568,8 +838,11 @@
         }, 350);
       }
 
+      let formulaFocusPosted = false;
       function setFormulaFocus(active) {
         exprBox.classList.toggle("is-picking", active);
+        if (formulaFocusPosted === active) return;
+        formulaFocusPosted = active;
         post({ type: "formula-focus", active });
       }
 
@@ -582,10 +855,6 @@
         window.setTimeout(() => {
           holdFormulaFocus = false;
         }, 500);
-      }
-
-      function expressionFilled() {
-        return getExpression().replace(/^=/, "").trim().length > 0;
       }
 
       function syncClearButton() {
@@ -667,10 +936,13 @@
         }
         if (msg.type === "insert-ref") {
           formulaMode = true;
-          exprDraft.value = "";
-          renderTokens(msg.formula);
+          const ids = msg.cellIds || [];
+          if (ids.length > 0) {
+            for (const id of ids) insertRefAtCaret(id);
+          } else if (msg.formula) {
+            renderTokens(msg.formula);
+          }
           requestPreview({ revealError: false });
-          scheduleCommit();
           keepFormulaFieldFocused();
           return;
         }
@@ -707,6 +979,7 @@
           formulaMode = true;
           exprDraft.value = "";
           renderTokens(msg.cell.formula);
+          if (msg.cell.error) showFormulaError(msg.cell.formatted);
         } else {
           exitFormulaMode();
           exprDraft.value = msg.cell.rawValue == null ? "" : String(msg.cell.rawValue);
@@ -717,6 +990,11 @@
 
       exprBox.addEventListener("click", (event) => {
         if (event.target.closest(".tag-remove")) return;
+        if (event.target === exprBox || event.target === equalsMark) {
+          if (formulaMode) setCaret(event.target === equalsMark ? 0 : formulaParts.length);
+          else exprDraft.focus();
+          return;
+        }
         exprDraft.focus();
       });
       clearExpr.addEventListener("mousedown", (event) => {
@@ -760,60 +1038,94 @@
             return;
           }
           setFormulaFocus(false);
-          requestPreview({ commit: true, revealError: true, silent: true });
+          commitFormula();
+          window.requestAnimationFrame(resizePlugin);
         }, 400);
       });
       exprDraft.addEventListener("input", () => {
         disarmClearUndo();
         hideFormulaError();
         if (!formulaMode && exprDraft.value.trimStart().startsWith("=")) {
-          enterFormulaMode();
-          exprDraft.value = exprDraft.value.trimStart().replace(/^=/, "").trimStart();
-          renderTokens("");
+          const rest = exprDraft.value.trimStart().replace(/^=/, "").trimStart();
+          exprDraft.value = "";
+          renderTokens(rest);
+        } else if (formulaMode) {
+          consumeLeadingOps();
+          commitSpacedDraft();
         }
+        updatePlaceholder();
         requestPreview({ revealError: false });
-        scheduleCommit();
         syncClearButton();
       });
       exprDraft.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
-          requestPreview({ commit: true, revealError: true, silent: true });
+          commitFormula();
           return;
         }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          return;
+        }
+        if (formulaMode && !event.metaKey && !event.ctrlKey && /^[+\-*/(),]$/.test(event.key)) {
+          event.preventDefault();
+          insertTokenAtCaret(event.key);
+          requestPreview({ revealError: false });
+          exprDraft.focus();
+          return;
+        }
+        if (formulaMode && event.key === " " && !event.metaKey && !event.ctrlKey) {
+          const draft = exprDraft.value.trim();
+          if (draft) {
+            event.preventDefault();
+            commitDraftAsTokens(draft);
+            requestPreview({ revealError: false });
+            exprDraft.focus();
+          }
+          return;
+        }
+        if (formulaMode && !exprDraft.value) {
+          if (event.key === "ArrowLeft" && caretIndex > 0) {
+            event.preventDefault();
+            setCaret(caretIndex - 1);
+            return;
+          }
+          if (event.key === "ArrowRight" && caretIndex < formulaParts.length) {
+            event.preventDefault();
+            setCaret(caretIndex + 1);
+            return;
+          }
+        }
         if (event.key !== "Backspace" || exprDraft.value) {
-          scheduleCommit();
           return;
         }
         if (!formulaMode) return;
-        const parts = parseParts(canonicalFormula);
-        if (parts.length === 0) {
-          event.preventDefault();
+        event.preventDefault();
+        if (caretIndex === 0 && formulaParts.length === 0) {
           exitFormulaMode();
           requestPreview({ revealError: false });
-          scheduleCommit();
           return;
         }
-        event.preventDefault();
-        parts.pop();
-        renderTokens(joinParts(parts));
+        if (caretIndex === 0) return;
+        formulaParts.splice(caretIndex - 1, 1);
+        caretIndex -= 1;
+        paintTokens();
         requestPreview({ revealError: false });
-        scheduleCommit();
       });
 
       kind.addEventListener("change", () => {
         requestPreview({ revealError: false });
-        scheduleCommit();
+        scheduleFormatCommit();
       });
       fractionDigits.addEventListener("input", () => {
         syncFractionLook();
         requestPreview({ revealError: false });
-        scheduleCommit();
+        scheduleFormatCommit();
       });
       for (const el of [cellId, currency, locale]) {
         el.addEventListener("change", () => {
           requestPreview({ revealError: false });
-          scheduleCommit();
+          scheduleFormatCommit();
         });
       }
 
@@ -821,10 +1133,17 @@
         event.preventDefault();
         if (formatOnly) {
           post({ type: "apply-format", format: currentFormat() });
-          return;
         }
-        requestPreview({ commit: true, revealError: true, silent: true });
       });
+      moreOptions.addEventListener("toggle", () => {
+        window.requestAnimationFrame(resizePlugin);
+      });
+      new ResizeObserver(() => {
+        window.requestAnimationFrame(resizePlugin);
+      }).observe(panel);
+      new ResizeObserver(() => {
+        window.requestAnimationFrame(resizePlugin);
+      }).observe(empty);
 
       post({ type: "ready" });
     </script>

@@ -81,6 +81,15 @@ describe("Milestone 2 — evaluator (cell references)", () => {
   it("returns a REF error for a missing cell instead of 0 or null", () => {
     expectError(evaluateFormula("a + missing", doc()), "REF");
   });
+
+  it("propagates a REF from a formula cell instead of producing NaN", () => {
+    const nested = createDoc([
+      { id: "a", formula: "missing" },
+      { id: "b", formula: "a + 1" },
+    ]);
+    expectError(evaluateFormula("a + 1", nested), "REF");
+    expectError(evaluateFormula("SUM(a, 2)", nested), "REF");
+  });
 });
 
 // Remove `.skip` after Milestone 2 (cell references) is green.

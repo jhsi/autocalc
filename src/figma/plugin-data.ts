@@ -47,19 +47,34 @@ export function cellIdFromLayerName(name: string): string {
   return id;
 }
 
-/** Stable unique ids when several layers share a name (Figma defaults to "Text"). */
-export function uniqueCellIds(
+export function isValidCellId(id: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9_]*$/.test(id);
+}
+
+const GENERIC_LAYER_IDS = new Set(["Text", "text", "Type", "cell", "Frame", "frame"]);
+
+/** Names Figma auto-assigns from content or defaults — not stable ids. */
+export function isGenericLayerId(id: string): boolean {
+  return GENERIC_LAYER_IDS.has(id) || /^c\d+$/.test(id);
+}
+
+/**
+ * Assign readable compact ids (`c1`, `c2`, …).
+ * Stored ids always win. Optional suggested ids (manual layer names) are used
+ * only when they are not generic / content-derived.
+ */
+export function assignStableCellIds(
   entries: readonly {
     nodeId: string;
     storedId?: string;
-    layerName: string;
+    suggestedId?: string;
   }[],
 ): Map<string, string> {
   const result = new Map<string, string>();
   const used = new Set<string>();
 
   for (const entry of entries) {
-    if (entry.storedId && !used.has(entry.storedId)) {
+    if (entry.storedId && isValidCellId(entry.storedId) && !used.has(entry.storedId)) {
       result.set(entry.nodeId, entry.storedId);
       used.add(entry.storedId);
     }
@@ -69,15 +84,30 @@ export function uniqueCellIds(
     if (result.has(entry.nodeId)) {
       continue;
     }
-    const base = cellIdFromLayerName(entry.layerName);
-    let id = base;
-    let n = 2;
-    while (used.has(id)) {
-      id = `${base}_${n}`;
+    const suggested = entry.suggestedId;
+    if (
+      suggested &&
+      isValidCellId(suggested) &&
+      !isGenericLayerId(suggested) &&
+      !used.has(suggested)
+    ) {
+      result.set(entry.nodeId, suggested);
+      used.add(suggested);
+    }
+  }
+
+  let n = 1;
+  for (const entry of entries) {
+    if (result.has(entry.nodeId)) {
+      continue;
+    }
+    while (used.has(`c${n}`)) {
       n += 1;
     }
+    const id = `c${n}`;
     result.set(entry.nodeId, id);
     used.add(id);
+    n += 1;
   }
 
   return result;
