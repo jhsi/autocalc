@@ -78,18 +78,7 @@ class Evaluator {
       case "number":
         return (n as NumberExpr).value;
       case "ref":
-        const id = (n as ReferenceExpr).id;
-        const cell = this.doc?.getCell(id)
-        if (cell !== undefined) {
-          if (cell.rawValue != undefined) {
-            return cell.rawValue;
-          } else {
-            throw valueError(id);
-          }
-        } else {
-          // TODO: handle groups
-          throw refError(id);
-        }
+        return getCellValue(n.id, this.doc);
       default:
         return 0;
     }
@@ -141,4 +130,21 @@ class Evaluator {
     }
     throw nameError(n.name);
   }
+}
+
+export function getCellValue(id: string, doc: DocumentAdapter | undefined) {
+  const cell = doc?.getCell(id)
+  if (cell !== undefined) {
+    if (cell.rawValue != undefined) {
+      return cell.rawValue;
+    } else if (cell.formula !== undefined) {
+      return evaluateFormula(cell?.formula, doc)
+    } else {
+      throw valueError(id);
+    }
+  } else {
+    // TODO: handle groups
+    throw refError(id);
+  }
+
 }

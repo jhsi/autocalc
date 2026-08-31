@@ -1,5 +1,8 @@
+import { identTok } from "../../tests/helpers.ts";
 import type { DocumentAdapter } from "../adapters/document-adapter.ts";
-import { notImplemented } from "./errors.ts";
+import { notImplemented, valueError } from "./errors.ts";
+import { evaluateFormula, getCellValue } from "./evaluator.ts";
+import { tokenize } from "./tokenizer.ts";
 import type { CellChange, CellId, CellResult, CellValue } from "./types.ts";
 
 /**
@@ -16,10 +19,14 @@ import type { CellChange, CellId, CellResult, CellValue } from "./types.ts";
  * changed, so a future Figma adapter can update only those text nodes.
  */
 export class ComputationEngine {
-  constructor(readonly document: DocumentAdapter) {}
+  private doc;
+
+  constructor(readonly document: DocumentAdapter) {
+    this.doc = document;
+  }
 
   getValue(_id: CellId): CellResult {
-    notImplemented("ComputationEngine.getValue", "src/core/engine.ts");
+    return getCellValue(_id, this.doc);
   }
 
   getFormattedValue(_id: CellId): string {
@@ -27,11 +34,32 @@ export class ComputationEngine {
   }
 
   setValue(_id: CellId, _value: CellValue): CellChange[] {
-    notImplemented("ComputationEngine.setValue", "src/core/engine.ts");
+    // naive: rerender everything
+    return this.doc.getAllCells().map((cell) => {
+      if (cell.id === _id) {
+        return {
+          id: _id,
+          value: _value
+        } satisfies CellChange
+      } else if (cell.formula && hasDependency(cell.formula, _id)) {
+        return {
+          id: cell.id,
+          value: getCellValue(cell.id, this.doc),
+        }
+      } else {
+        return null;
+      }
+    }).filter(c => c !== null)
   }
 
   setFormula(_id: CellId, _formula: string | undefined): CellChange[] {
-    notImplemented("ComputationEngine.setFormula", "src/core/engine.ts");
+    // naive: rerender everything
+    return this.doc.getAllCells().map((cell) => {
+      return {
+        id: cell.id,
+        value: getCellValue(cell.id, this.doc),
+      }
+    })
   }
 
   directDependenciesOf(_id: CellId): CellId[] {
@@ -49,4 +77,8 @@ export class ComputationEngine {
   dependentsOf(_id: CellId): CellId[] {
     notImplemented("ComputationEngine.dependentsOf", "src/core/engine.ts");
   }
+}
+
+function hasDependency(srcId: string, depId: string) {
+  return true; // naively recalculate everything
 }
