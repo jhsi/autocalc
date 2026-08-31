@@ -1,7 +1,8 @@
 import { identTok } from "../../tests/helpers.ts";
 import type { DocumentAdapter } from "../adapters/document-adapter.ts";
-import { notImplemented, valueError } from "./errors.ts";
+import { errorLabel, isComputeError, notImplemented, valueError } from "./errors.ts";
 import { evaluateFormula, getCellValue } from "./evaluator.ts";
+import { formatValue } from "./formatter.ts";
 import { tokenize } from "./tokenizer.ts";
 import type { CellChange, CellId, CellResult, CellValue } from "./types.ts";
 
@@ -29,8 +30,12 @@ export class ComputationEngine {
     return getCellValue(_id, this.doc);
   }
 
-  getFormattedValue(_id: CellId): string {
-    notImplemented("ComputationEngine.getFormattedValue", "src/core/engine.ts");
+  getFormattedValue(id: CellId): string {
+    const result = this.getValue(id);
+    if (isComputeError(result)) {
+      return errorLabel(result);
+    }
+    return formatValue(result, this.doc.getCell(id)?.format);
   }
 
   setValue(_id: CellId, _value: CellValue): CellChange[] {

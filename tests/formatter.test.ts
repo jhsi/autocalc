@@ -4,7 +4,7 @@ import { ComputationEngine } from "../src/core/engine.ts";
 import { createDoc, expectValue } from "./helpers.ts";
 
 // Remove `.skip` after Milestone 8 (circular references) is green.
-describe.skip("Milestone 9 — formatting", () => {
+describe("Milestone 9 — formatting", () => {
   it("formats a plain number with grouping separators", () => {
     expect(formatValue(1234.56, { kind: "number", locale: "en-US" })).toBe(
       "1,234.56",
