@@ -10,6 +10,7 @@ import {
   parseCharactersAsValue,
   parseLiteralInput,
   parseStoredCell,
+  resolvedCellContent,
   serializeStoredCell,
 } from "../src/figma/plugin-data.ts";
 
@@ -77,5 +78,33 @@ describe("Figma pluginData", () => {
     expect(isHintNode(hint)).toBe(true);
     expect(isOverlayNode(hint)).toBe(true);
     expect(isOverlayNode(cell)).toBe(false);
+  });
+
+  it("keeps formula, raw value, and formatted canvas text separate", () => {
+    const formulaCell = resolvedCellContent(
+      {
+        cellId: "total",
+        formula: "c1 + c2",
+        format: { kind: "number", locale: "en-US" },
+      },
+      "2,400",
+    );
+    expect(formulaCell.formula).toBe("c1 + c2");
+    expect(formulaCell.rawValue).toBeUndefined();
+    expect(formulaCell.format?.kind).toBe("number");
+
+    const literalCell = resolvedCellContent(
+      {
+        cellId: "price",
+        rawValue: 2400,
+        format: { kind: "currency", currency: "USD", locale: "en-US" },
+      },
+      "$2,400.00",
+    );
+    expect(literalCell.formula).toBeUndefined();
+    expect(literalCell.rawValue).toBe(2400);
+
+    const unmanaged = resolvedCellContent(undefined, "20%");
+    expect(unmanaged.rawValue).toBe(0.2);
   });
 });

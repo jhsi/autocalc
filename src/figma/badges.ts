@@ -55,13 +55,13 @@ export async function showIdBadges(
     }
     const id = adapter.cellFromNode(target).id;
     const badge = figma.createText();
+    badge.setPluginData(BADGE_KEY, id);
+    badge.name = `id:${id}`;
     badge.fontName = font;
     badge.fontSize = 10;
     badge.textAutoResize = "WIDTH_AND_HEIGHT";
     badge.characters = id;
     badge.fills = [{ type: "SOLID", color: LABEL_COLOR }];
-    badge.name = `id:${id}`;
-    badge.setPluginData(BADGE_KEY, id);
     figma.currentPage.appendChild(badge);
     badge.x = box.x + box.width + 6;
     badge.y = box.y;

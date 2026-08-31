@@ -39,6 +39,10 @@ export async function setTextCharacters(
   node: TextNode,
   text: string,
 ): Promise<void> {
+  if (node.characters === text && node.fontName !== figma.mixed) {
+    return;
+  }
+
   const fonts = collectFonts(node);
   const loaded = await Promise.all(
     (fonts.length > 0 ? fonts : [{ family: "Inter", style: "Regular" }]).map(
@@ -56,5 +60,7 @@ export async function setTextCharacters(
     node.fontName = chosen;
   }
 
-  node.characters = text;
+  if (node.characters !== text) {
+    node.characters = text;
+  }
 }

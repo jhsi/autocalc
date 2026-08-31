@@ -896,11 +896,7 @@
       function scheduleFormatCommit() {
         window.clearTimeout(commitTimer);
         commitTimer = window.setTimeout(() => {
-          if (formatOnly) {
-            post({ type: "apply-format", format: currentFormat(), silent: true });
-            return;
-          }
-          requestPreview({ commit: true, silent: true, revealError: false });
+          post({ type: "apply-format", format: currentFormat(), silent: true });
         }, 350);
       }
 
@@ -1031,6 +1027,15 @@
           return;
         }
         if (msg.type !== "selection") return;
+        if (
+          formulaFieldBusy() &&
+          msg.mode === "cell" &&
+          msg.cell &&
+          msg.cell.cellId === cellId.value
+        ) {
+          if (msg.cell.format) setFormat(msg.cell.format);
+          return;
+        }
         hideFormulaError();
         previewError = false;
         if (msg.mode === "empty" || (!msg.cell && msg.mode !== "format-only")) {
@@ -1189,19 +1194,19 @@
       kind.addEventListener("change", () => {
         syncAdvancedFormatFields();
         if (kind.value === "currency") moreOptions.open = true;
-        requestPreview({ revealError: false });
         scheduleFormatCommit();
       });
       fractionDigits.addEventListener("change", () => {
-        requestPreview({ revealError: false });
         scheduleFormatCommit();
       });
-      for (const el of [cellId, currency, locale]) {
+      for (const el of [currency, locale]) {
         el.addEventListener("change", () => {
-          requestPreview({ revealError: false });
           scheduleFormatCommit();
         });
       }
+      cellId.addEventListener("change", () => {
+        requestPreview({ revealError: false });
+      });
 
       panel.addEventListener("submit", (event) => {
         event.preventDefault();

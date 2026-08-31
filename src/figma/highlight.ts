@@ -69,6 +69,8 @@ export async function showFormulaHints(
     seen.add(target.node.id);
 
     const rect = figma.createRectangle();
+    rect.setPluginData(HINT_KEY, target.label);
+    rect.name = `hint:${target.label}`;
     rect.resize(Math.max(box.width, 1), Math.max(box.height, 1));
     rect.x = box.x;
     rect.y = box.y;
@@ -80,8 +82,6 @@ export async function showFormulaHints(
       rect.strokeAlign = "OUTSIDE";
     }
     rect.locked = true;
-    rect.name = `hint:${target.label}`;
-    rect.setPluginData(HINT_KEY, target.label);
     figma.currentPage.appendChild(rect);
     hints.push(rect);
 
@@ -89,14 +89,14 @@ export async function showFormulaHints(
       continue;
     }
     const label = figma.createText();
+    label.setPluginData(HINT_KEY, target.label);
+    label.name = `hint-id:${target.label}`;
     label.fontName = font;
     label.fontSize = 10;
     label.textAutoResize = "WIDTH_AND_HEIGHT";
     label.characters = target.label;
     label.fills = [{ type: "SOLID", color: HINT_COLOR }];
     label.locked = true;
-    label.name = `hint-id:${target.label}`;
-    label.setPluginData(HINT_KEY, target.label);
     figma.currentPage.appendChild(label);
     label.x = box.x;
     label.y = box.y - label.height - 4;

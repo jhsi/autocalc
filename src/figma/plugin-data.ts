@@ -21,6 +21,11 @@ export function isOverlayNode(node: { getPluginData(key: string): string }): boo
   return isBadgeNode(node) || isHintNode(node);
 }
 
+/** Overlay layers are named `id:…`, `hint:…`, or `hint-id:…` before pluginData is readable. */
+export function isOverlayName(name: string): boolean {
+  return name.startsWith("id:") || name.startsWith("hint:") || name.startsWith("hint-id:");
+}
+
 export interface StoredCell {
   /** Stable formula identifier. Independent of the layer name. */
   cellId: string;
@@ -162,6 +167,35 @@ export function parseLiteralInput(input: string): CellValue {
     return Number(trimmed);
   }
   return trimmed;
+}
+
+/**
+ * Resolve formula / rawValue / format from pluginData.
+ * Canvas characters are display-only: they are parsed only when a layer has
+ * no stored formula and no stored rawValue.
+ */
+export function resolvedCellContent(
+  stored: StoredCell | undefined,
+  canvasCharacters: string,
+): {
+  formula?: string;
+  rawValue?: CellValue;
+  format?: CellFormat;
+} {
+  const fromCanvas = parseCharactersAsValue(canvasCharacters);
+  if (!stored) {
+    return { rawValue: fromCanvas };
+  }
+  return {
+    formula: stored.formula,
+    rawValue:
+      stored.formula !== undefined
+        ? undefined
+        : stored.rawValue !== undefined
+          ? stored.rawValue
+          : fromCanvas,
+    format: stored.format,
+  };
 }
 
 /**

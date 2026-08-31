@@ -8,8 +8,8 @@ import {
   cellIdFromLayerName,
   isGenericLayerId,
   isOverlayNode,
-  parseCharactersAsValue,
   parseStoredCell,
+  resolvedCellContent,
   serializeStoredCell,
   type StoredCell,
 } from "./plugin-data.ts";
@@ -68,26 +68,19 @@ export class FigmaDocumentAdapter implements DocumentAdapter {
     this.cellIdMap = undefined;
   }
 
+  /**
+   * Formula, rawValue, and format live in pluginData.
+   * node.characters is display-only (formatted output) and is never
+   * treated as formula source. Canvas text is only parsed for layers
+   * that have no stored formula or rawValue.
+   */
   cellFromNode(node: TextNode): Cell {
     const stored = this.readStored(node);
     const id = this.idOf(node);
-    const fromCanvas = parseCharactersAsValue(node.characters);
-    if (stored) {
-      return {
-        id,
-        name: node.name,
-        formula: stored.formula,
-        rawValue:
-          stored.formula !== undefined
-            ? undefined
-            : (stored.rawValue !== undefined ? stored.rawValue : fromCanvas),
-        format: stored.format,
-      };
-    }
     return {
       id,
       name: node.name,
-      rawValue: fromCanvas,
+      ...resolvedCellContent(stored, node.characters),
     };
   }
 
