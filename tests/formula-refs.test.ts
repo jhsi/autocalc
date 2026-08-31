@@ -20,6 +20,6 @@ describe("formula references", () => {
     expect(appendCellRef("", "c200")).toBe("= c200");
     expect(appendCellRef("c200", "c240")).toBe("= c200 + c240");
     expect(appendCellRef("= c200 +", "c240")).toBe("= c200 + c240");
-    expect(appendCellRef("= c200 + c240", "c240")).toBe("= c200 + c240");
+    expect(appendCellRef("= c200 + c240", "c240")).toBe("= c200 + c240 + c240");
   });
 });

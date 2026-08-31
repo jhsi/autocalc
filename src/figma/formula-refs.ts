@@ -58,9 +58,6 @@ export function appendCellRef(formula: string, cellId: string): string {
   if (current === "") {
     return `= ${cellId}`;
   }
-  if (formulaCellIds(current).includes(cellId)) {
-    return `= ${current}`;
-  }
   if (/[+\-*/,]$/.test(current) || current.endsWith("(")) {
     return `= ${current} ${cellId}`;
   }

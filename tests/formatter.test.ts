@@ -60,6 +60,16 @@ describe("Milestone 9 — formatting", () => {
     expectValue(engine.getValue("doubled"), 0.4);
     expect(engine.getFormattedValue("n")).toBe("20%");
   });
+
+  it("uses locale grouping and decimal separators for currency", () => {
+    const out = formatValue(1234.56, {
+      kind: "currency",
+      locale: "de-DE",
+      currency: "EUR",
+    });
+    expect(out).toMatch(/1\.234,56/);
+    expect(out).toContain("€");
+  });
 });
 
 describe("formatting without Intl (Figma plugin sandbox)", () => {
@@ -121,5 +131,24 @@ describe("formatting without Intl (Figma plugin sandbox)", () => {
 
   it("defaults missing format kind to number", () => {
     expect(formatValue(1234.56)).toBe("1,234.56");
+  });
+
+  it("swaps grouping and decimal for German locale", () => {
+    expect(formatValue(1234.56, { kind: "number", locale: "de-DE" })).toBe(
+      "1.234,56",
+    );
+    expect(
+      formatValue(1234.56, {
+        kind: "currency",
+        locale: "de-DE",
+        currency: "EUR",
+      }),
+    ).toBe("1.234,56 €");
+  });
+
+  it("uses a narrow grouping space for French locale", () => {
+    expect(formatValue(1234.56, { kind: "number", locale: "fr-FR" })).toBe(
+      "1\u00A0234,56",
+    );
   });
 });
