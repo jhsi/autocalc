@@ -40,11 +40,10 @@ Cell ids are stable (`c1`, `c2`, …) and live in plugin data, not the layer nam
 = (c1 + c2) / c3
 ```
 Supported today:
-| | |
 | --- | --- |
 | Arithmetic | `+` `-` `*` `/` and parentheses |
 | Functions | `SUM` `AVG` `MIN` `MAX` |
-| Numbers | `8`, `1.5`, `.8` (leading-dot decimals) |
+| Numbers | `8`, `1.5`, `0.8` |
 Errors on the canvas look like `❌ REF!`, `❌ DIV/0!`, `❌ CYCLE!`, and similar.
 ### Formatting
 Format is metadata, not part of the formula. Evaluation stays numeric; only the canvas string is formatted.
