@@ -6,7 +6,6 @@ import type { CellId } from "./types.ts";
  */
 export type Expr =
   | NumberExpr
-  | StringExpr
   | ReferenceExpr
   | BinaryExpr
   | CallExpr;
@@ -14,11 +13,6 @@ export type Expr =
 export interface NumberExpr {
   kind: "number";
   value: number;
-}
-
-export interface StringExpr {
-  kind: "string";
-  value: string;
 }
 
 /** A stable cell or group id. The tokenizer/parser treat identifiers as ids. */
