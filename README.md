@@ -1,10 +1,10 @@
 # AutoCalc
-Create formulas in Figma text cells
-
-https://github.com/user-attachments/assets/b2ed1687-5764-4b22-b712-3cde6bf83ae0
 
 Spreadsheet-style formulas for Figma text layers.
 Pick a layer, type `= c1 + c2` (or `AVG(c1, c2)`), and Autocalc writes the computed, formatted value onto the canvas. Formula source, raw values, and display formatting stay separate: the characters you see on the canvas are display-only.
+
+https://github.com/user-attachments/assets/b2ed1687-5764-4b22-b712-3cde6bf83ae0
+
 This repo is two pieces:
 - **`src/core`** — a Figma-free computation engine (tokenize, parse, evaluate, format)
 - **`src/figma`** — the Autocalc plugin that binds that engine to the current page
