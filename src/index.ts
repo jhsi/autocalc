@@ -1,4 +1,4 @@
-export type { Expr, BinaryOp, BinaryExpr, CallExpr, NumberExpr, ReferenceExpr, StringExpr } from "./core/ast.ts";
+export type { Expr, BinaryOp, BinaryExpr, CallExpr, NumberExpr, ReferenceExpr } from "./core/ast.ts";
 export { ComputationEngine } from "./core/engine.ts";
 export {
   ComputeError,
@@ -30,7 +30,6 @@ export type {
   CellChange,
   CellFormat,
   CellFormatKind,
-  CellGroup,
   CellId,
   CellResult,
   CellValue,

@@ -1,56 +1,42 @@
-# Future Figma adapter
+# Figma plugin
 
-The headless engine in `src/core` must stay Figma-free. This directory is where
-a plugin adapter will later implement `DocumentAdapter` against the Figma scene
-graph.
-
-Do not add `@figma/plugin-typings` or plugin code until the engine milestones
-are in place.
+The headless engine in `src/core` stays Figma-free. This folder is the plugin: a `DocumentAdapter` over the scene graph, plus a UI for formulas and display formats.
 
 ## Concept mapping
 
 ```text
 Figma TextNode              → Cell
-Figma Frame / Group         → CellGroup
-TextNode.id                 → CellId
-pluginData on TextNode      → formula + formatting metadata
-computed CellValue          → TextNode.characters
+TextNode.id                 → used only to find the node
+pluginData on TextNode      → cell id, formula, rawValue, format
+computed formatted value    → TextNode.characters
 ```
 
-Names (`TextNode.name`, layer names) are presentation only. Formulas stored in
-the engine must reference stable node ids, not visible names.
+Formulas cannot use Figma's native ids (`3:12`) because the formula language identifiers must start with a letter. Each managed layer gets a stable **cell id** (default: sanitized layer name) stored in `pluginData`. Rename the layer freely; formulas keep working until you change the cell id.
 
-A frame's child nodes become `CellGroup.children`. Nested frames become nested
-groups.
+Unmanaged text layers can still be referenced by their sanitized layer name. Their visible characters are parsed as the literal (so `price * qty` works if those layers contain numbers).
 
-## Integration concerns (unsolved on purpose)
+## Install (development)
 
-These are real plugin problems. Do not solve them in the core engine:
+1. `npm install`
+2. `npm run figma:build` (or `npm run figma:watch`)
+3. In Figma: **Plugins → Development → Import plugin from manifest…**
+4. Choose `dist/figma/manifest.json`
 
-- Loading fonts before changing `TextNode.characters`
-- Storing formulas and format metadata in `pluginData`
-- Listening to document changes while the plugin runs
-- Resolving nodes by id (`figma.getNodeById`)
-- Traversing frames and groups
-- Node deletion (cells that formulas still reference)
-- Duplication producing new Figma node ids
-- Renamed layers (ids stay stable; names do not)
-- Preserving mixed text styles when writing `characters`
-- Undo behavior (`figma.commitUndo` / plugin-initiated edits)
+## Use
 
-## Suggested adapter shape (later)
+1. Select a text layer.
+2. Set a **cell id** (`price`), either a **literal** (`1234.56`) or a **formula** (`qty * price`).
+3. Pick a format (number / currency / percent / compact).
+4. Type a **value**, or start with `=` for a **formula**. Apply writes pluginData, then recalculates every managed cell on the page.
+5. Focus the **formula** field. Tiny cell ids appear next to other text layers — click one to insert it. **⌘⇧-click** a layer also inserts the nearest text cell.
+6. Selecting a formula cell highlights its referenced layers. Selecting a referenced input highlights its parent frame.
+7. **Unlink** removes pluginData and leaves the current text in place.
 
-```ts
-class FigmaDocumentAdapter implements DocumentAdapter {
-  getCell(id: CellId): Cell | undefined { /* read TextNode + pluginData */ }
-  getGroup(id: string): CellGroup | undefined { /* read Frame/Group */ }
-  // ...
-}
-```
+Only managed layers (ones you have Applied) are overwritten. Formatting is display-only: evaluation stays numeric.
 
-The plugin would:
+## Integration notes
 
-1. Walk the current page into a `DocumentAdapter` view (or query it live).
-2. Construct `ComputationEngine`.
-3. On edits, call `engine.setValue` / `engine.setFormula`.
-4. Apply returned `CellChange[]` back onto the corresponding text nodes.
+- Fonts are loaded before writing `characters`. Mixed-style text is flattened to a single font for the new string.
+- `figma.commitUndo()` batches each Apply into one undo step.
+- Duplicate cell ids: the first match wins. Give layers unique cell ids.
+- Groups / frames as formula ranges are not wired yet.

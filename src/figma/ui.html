@@ -1,0 +1,832 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font: 11px/1.4 Inter, system-ui, sans-serif;
+        background: var(--figma-color-bg);
+        color: var(--figma-color-text);
+      }
+      .wrap {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .muted {
+        color: var(--figma-color-text-secondary);
+      }
+      label,
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-weight: 600;
+      }
+      .expr-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 18px;
+      }
+      .expr-label {
+        font-weight: 600;
+      }
+      .expr-label .mode-on {
+        color: var(--figma-color-text);
+        font-weight: 700;
+      }
+      .expr-label .mode-off {
+        color: var(--figma-color-text-secondary);
+        font-weight: 500;
+      }
+      input,
+      select {
+        height: 28px;
+        padding: 0 8px;
+        border: 1px solid var(--figma-color-border);
+        border-radius: 6px;
+        background: var(--figma-color-bg-secondary);
+        color: var(--figma-color-text);
+        font: inherit;
+      }
+      input:focus,
+      select:focus {
+        outline: 2px solid var(--figma-color-border-brand);
+        outline-offset: 1px;
+      }
+      .formula-box {
+        min-height: 88px;
+        padding: 8px 10px;
+        border: 1px solid var(--figma-color-border);
+        border-radius: 8px;
+        background: var(--figma-color-bg-secondary);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        align-content: flex-start;
+        gap: 6px;
+        cursor: text;
+        width: 100%;
+      }
+      .clear-expr {
+        height: auto;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--figma-color-text-secondary);
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.4;
+        flex-shrink: 0;
+      }
+      .clear-expr:hover {
+        background: transparent;
+        color: var(--figma-color-text);
+        text-decoration: underline;
+      }
+      .formula-box:focus-within,
+      .formula-box.is-picking {
+        outline: 2px solid var(--figma-color-border-brand);
+        outline-offset: 1px;
+      }
+      .formula-box.is-formula {
+        border-color: var(--figma-color-border-brand);
+      }
+      .formula-box.is-error {
+        border-color: var(--figma-color-border-danger, #f24822);
+      }
+      .formula-box.is-error:focus-within,
+      .formula-box.is-error.is-picking {
+        outline-color: var(--figma-color-border-danger, #f24822);
+      }
+      .equals {
+        font-weight: 700;
+        font-size: 14px;
+        line-height: 24px;
+        color: var(--figma-color-bg-brand);
+        padding: 0 2px 0 2px;
+      }
+      #formulaTokens {
+        display: contents;
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 24px;
+        padding: 0 4px 0 8px;
+        border-radius: 6px;
+        background: var(--figma-color-bg-brand);
+        color: var(--figma-color-text-onbrand);
+        font-weight: 600;
+        font-size: 12px;
+        user-select: none;
+        cursor: default;
+      }
+      .tag-label {
+        pointer-events: none;
+      }
+      .tag-remove {
+        height: 18px;
+        width: 18px;
+        min-width: 18px;
+        padding: 0;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: inherit;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .tag-remove:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .op {
+        color: var(--figma-color-text-secondary);
+        font-weight: 600;
+        font-size: 13px;
+        line-height: 24px;
+        padding: 0 1px;
+      }
+      #exprDraft {
+        flex: 1 1 80px;
+        min-width: 80px;
+        height: 24px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        outline: none;
+        box-shadow: none;
+        font-size: 12px;
+      }
+      .format-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 8px;
+      }
+      #fractionDigits.is-auto,
+      #fractionDigits:placeholder-shown {
+        opacity: 0.55;
+        color: var(--figma-color-text-secondary);
+      }
+      button {
+        height: 32px;
+        border: 0;
+        border-radius: 6px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .expr-error {
+        font-weight: 400;
+        font-size: 10px;
+        color: var(--figma-color-text-danger);
+      }
+      .more {
+        border-top: 1px solid var(--figma-color-border);
+        padding-top: 6px;
+      }
+      .more summary {
+        cursor: pointer;
+        color: var(--figma-color-text-secondary);
+        font-size: 10px;
+        font-weight: 500;
+        list-style: none;
+      }
+      .more summary::-webkit-details-marker {
+        display: none;
+      }
+      .more summary::before {
+        content: "▸ ";
+      }
+      .more[open] summary::before {
+        content: "▾ ";
+      }
+      .more .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .empty {
+        padding: 32px 20px 24px;
+        text-align: center;
+        color: var(--figma-color-text-secondary);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .empty svg {
+        width: 160px;
+        height: auto;
+        opacity: 0.95;
+      }
+      .empty p {
+        margin: 0;
+        max-width: 220px;
+        line-height: 1.45;
+      }
+      .format-only-banner {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="empty" class="empty">
+      <svg viewBox="0 0 200 140" fill="none" aria-hidden="true">
+        <rect x="28" y="18" width="144" height="104" rx="12" fill="var(--figma-color-bg-secondary)" stroke="var(--figma-color-border)" />
+        <rect x="44" y="36" width="72" height="10" rx="3" fill="var(--figma-color-bg-tertiary, #3a3a3a)" />
+        <rect x="44" y="54" width="96" height="10" rx="3" fill="var(--figma-color-bg-brand)" opacity="0.85" />
+        <rect x="44" y="72" width="56" height="10" rx="3" fill="var(--figma-color-bg-tertiary, #3a3a3a)" />
+        <rect x="44" y="90" width="80" height="10" rx="3" fill="var(--figma-color-bg-tertiary, #3a3a3a)" />
+        <path d="M132 78l18 6-6 3 8 14-5 3-8-14-4 7-3-19z" fill="var(--figma-color-text)" />
+      </svg>
+      <p>Select a text layer to attach a formula or format.</p>
+    </div>
+    <form id="panel" class="wrap" hidden>
+      <p class="format-only-banner" id="formatOnlyBanner" hidden></p>
+      <input id="cellId" type="hidden" />
+      <div id="exprSection" class="field">
+        <div class="expr-head">
+          <span class="expr-label">
+            <span id="modeFormula" class="mode-off">Formula</span>
+            <span class="mode-off"> or </span>
+            <span id="modeValue" class="mode-on">value</span>
+          </span>
+          <button type="button" id="clearExpr" class="clear-expr" hidden>Clear</button>
+        </div>
+        <div class="formula-box" id="exprBox">
+          <span id="equalsMark" class="equals" hidden>=</span>
+          <div id="formulaTokens"></div>
+          <input id="exprDraft" placeholder="1234.56 or = to start a formula" spellcheck="false" />
+        </div>
+        <span class="expr-error" id="exprError" hidden></span>
+      </div>
+      <div class="format-row">
+        <label>
+          Format
+          <select id="kind">
+            <option value="number">Number</option>
+            <option value="currency">Currency</option>
+            <option value="percent">Percent</option>
+            <option value="compact">Compact</option>
+          </select>
+        </label>
+        <label>
+          Digits
+          <input id="fractionDigits" type="number" min="0" max="8" placeholder="Auto" class="is-auto" />
+        </label>
+      </div>
+      <details class="more">
+        <summary>Locale &amp; currency</summary>
+        <div class="stack">
+          <label>
+            Currency
+            <select id="currency"></select>
+          </label>
+          <label>
+            Locale
+            <select id="locale"></select>
+          </label>
+        </div>
+      </details>
+    </form>
+    <script>
+      const FN = new Set(["SUM", "AVG", "MIN", "MAX"]);
+      const CURRENCIES = [
+        ["USD", "🇺🇸 US Dollar"],
+        ["EUR", "🇪🇺 Euro"],
+        ["GBP", "🇬🇧 British Pound"],
+        ["JPY", "🇯🇵 Japanese Yen"],
+        ["CNY", "🇨🇳 Chinese Yuan"],
+        ["KRW", "🇰🇷 South Korean Won"],
+        ["CAD", "🇨🇦 Canadian Dollar"],
+        ["AUD", "🇦🇺 Australian Dollar"],
+        ["CHF", "🇨🇭 Swiss Franc"],
+        ["INR", "🇮🇳 Indian Rupee"],
+        ["MXN", "🇲🇽 Mexican Peso"],
+        ["BRL", "🇧🇷 Brazilian Real"],
+        ["SEK", "🇸🇪 Swedish Krona"],
+        ["NOK", "🇳🇴 Norwegian Krone"],
+        ["DKK", "🇩🇰 Danish Krone"],
+        ["SGD", "🇸🇬 Singapore Dollar"],
+        ["HKD", "🇭🇰 Hong Kong Dollar"],
+        ["NZD", "🇳🇿 New Zealand Dollar"],
+        ["TWD", "🇹🇼 New Taiwan Dollar"],
+        ["PLN", "🇵🇱 Polish Złoty"],
+      ];
+      const LOCALES = [
+        ["en-US", "English (United States)"],
+        ["en-GB", "English (United Kingdom)"],
+        ["en-CA", "English (Canada)"],
+        ["en-AU", "English (Australia)"],
+        ["de-DE", "German (Germany)"],
+        ["fr-FR", "French (France)"],
+        ["fr-CA", "French (Canada)"],
+        ["es-ES", "Spanish (Spain)"],
+        ["es-MX", "Spanish (Mexico)"],
+        ["it-IT", "Italian (Italy)"],
+        ["pt-BR", "Portuguese (Brazil)"],
+        ["pt-PT", "Portuguese (Portugal)"],
+        ["ja-JP", "Japanese (Japan)"],
+        ["zh-CN", "Chinese (Simplified)"],
+        ["zh-TW", "Chinese (Traditional)"],
+        ["ko-KR", "Korean (South Korea)"],
+        ["nl-NL", "Dutch (Netherlands)"],
+        ["sv-SE", "Swedish (Sweden)"],
+        ["nb-NO", "Norwegian (Norway)"],
+        ["da-DK", "Danish (Denmark)"],
+        ["fi-FI", "Finnish (Finland)"],
+        ["pl-PL", "Polish (Poland)"],
+        ["ru-RU", "Russian (Russia)"],
+        ["tr-TR", "Turkish (Turkey)"],
+        ["hi-IN", "Hindi (India)"],
+        ["th-TH", "Thai (Thailand)"],
+        ["vi-VN", "Vietnamese (Vietnam)"],
+        ["id-ID", "Indonesian (Indonesia)"],
+        ["ar-SA", "Arabic (Saudi Arabia)"],
+        ["he-IL", "Hebrew (Israel)"],
+      ];
+
+      const empty = document.getElementById("empty");
+      const panel = document.getElementById("panel");
+      const formatOnlyBanner = document.getElementById("formatOnlyBanner");
+      const exprSection = document.getElementById("exprSection");
+      const cellId = document.getElementById("cellId");
+      const exprBox = document.getElementById("exprBox");
+      const equalsMark = document.getElementById("equalsMark");
+      const formulaTokens = document.getElementById("formulaTokens");
+      const exprDraft = document.getElementById("exprDraft");
+      const clearExpr = document.getElementById("clearExpr");
+      const modeFormula = document.getElementById("modeFormula");
+      const modeValue = document.getElementById("modeValue");
+      const exprError = document.getElementById("exprError");
+      const kind = document.getElementById("kind");
+      const fractionDigits = document.getElementById("fractionDigits");
+      const currency = document.getElementById("currency");
+      const locale = document.getElementById("locale");
+
+      let canonicalFormula = "";
+      let formulaMode = false;
+      let formatOnly = false;
+      let blurTimer = 0;
+      let commitTimer = 0;
+      let previewError = false;
+      let holdFormulaFocus = false;
+      let clearUndoArmed = false;
+      let clearUndoTimer = 0;
+      const CLEAR_UNDO_MS = 5000;
+
+      for (const [code, label] of CURRENCIES) {
+        const option = document.createElement("option");
+        option.value = code;
+        option.textContent = label;
+        currency.append(option);
+      }
+      currency.value = "USD";
+      for (const [code, label] of LOCALES) {
+        const option = document.createElement("option");
+        option.value = code;
+        option.textContent = label;
+        locale.append(option);
+      }
+      locale.value = "en-US";
+
+      function post(pluginMessage) {
+        parent.postMessage({ pluginMessage }, "*");
+      }
+
+      function parseParts(source) {
+        const formula = source.trim().replace(/^=/, "").trim();
+        if (!formula) return [];
+        const re = /([A-Za-z][A-Za-z0-9_]*)|(\d+\.?\d*)|([+\-*/(),])/g;
+        const parts = [];
+        let match;
+        while ((match = re.exec(formula))) {
+          if (match[1] && !FN.has(match[1])) parts.push({ kind: "ref", value: match[1] });
+          else parts.push({ kind: "text", value: match[0] });
+        }
+        return parts;
+      }
+
+      function joinParts(parts) {
+        return parts.map((part) => part.value).join(" ").replace(/\s+/g, " ").trim();
+      }
+
+      function getExpression() {
+        const draft = exprDraft.value.trim();
+        if (!formulaMode) return draft;
+        const body = [canonicalFormula, draft].filter(Boolean).join(" ");
+        return body ? `= ${body}` : "=";
+      }
+
+      function updateMode() {
+        formulaMode = getExpression().trim().startsWith("=") || formulaMode && canonicalFormula.length > 0;
+        equalsMark.hidden = !formulaMode;
+        exprBox.classList.toggle("is-formula", formulaMode);
+        modeFormula.className = formulaMode ? "mode-on" : "mode-off";
+        modeValue.className = formulaMode ? "mode-off" : "mode-on";
+        exprDraft.placeholder = formulaMode ? "price * qty" : "1234.56 or = to start a formula";
+        syncClearButton();
+      }
+
+      function enterFormulaMode() {
+        formulaMode = true;
+        if (!canonicalFormula && exprDraft.value.trim().startsWith("=")) {
+          exprDraft.value = exprDraft.value.trim().replace(/^=/, "").trim();
+        }
+        updateMode();
+      }
+
+      function exitFormulaMode() {
+        formulaMode = false;
+        canonicalFormula = "";
+        formulaTokens.replaceChildren();
+        updateMode();
+      }
+
+      function renderTokens(source) {
+        canonicalFormula = source.trim().replace(/^=/, "").trim();
+        formulaTokens.replaceChildren();
+        if (!formulaMode) return;
+        parseParts(canonicalFormula).forEach((part, index) => {
+          if (part.kind === "ref") {
+            const tag = document.createElement("span");
+            tag.className = "tag";
+            const label = document.createElement("span");
+            label.className = "tag-label";
+            label.textContent = part.value;
+            tag.append(label);
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "tag-remove";
+            remove.setAttribute("aria-label", `Remove ${part.value}`);
+            remove.textContent = "×";
+            remove.addEventListener("mousedown", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            });
+            remove.addEventListener("click", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const next = parseParts(canonicalFormula).filter((_, i) => i !== index);
+              renderTokens(joinParts(next));
+              requestPreview({ revealError: false });
+              scheduleCommit();
+              exprDraft.focus();
+            });
+            tag.addEventListener("mousedown", (event) => {
+              if (event.target.closest(".tag-remove")) return;
+              event.preventDefault();
+              event.stopPropagation();
+            });
+            tag.addEventListener("click", (event) => {
+              if (event.target.closest(".tag-remove")) return;
+              event.preventDefault();
+              event.stopPropagation();
+              exprDraft.focus();
+            });
+            tag.append(remove);
+            formulaTokens.append(tag);
+          } else {
+            const op = document.createElement("span");
+            op.className = "op";
+            op.textContent = part.value;
+            formulaTokens.append(op);
+          }
+        });
+        updateMode();
+      }
+
+      function ensureSelectValue(select, value) {
+        if (!value) return;
+        if (![...select.options].some((option) => option.value === value)) {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = value;
+          select.append(option);
+        }
+        select.value = value;
+      }
+
+      function syncFractionLook() {
+        fractionDigits.classList.toggle("is-auto", fractionDigits.value === "");
+      }
+
+      function currentFormat() {
+        const format = {
+          kind: kind.value || "number",
+          locale: locale.value || "en-US",
+        };
+        if (fractionDigits.value !== "") format.fractionDigits = Number(fractionDigits.value);
+        if (format.kind === "currency") format.currency = currency.value || "USD";
+        return format;
+      }
+
+      function payload(extra = {}) {
+        const expression = getExpression();
+        const isFormula = expression.trim().startsWith("=");
+        return {
+          cellId: cellId.value,
+          formula: isFormula ? expression : "",
+          rawValue: isFormula ? "" : expression,
+          format: currentFormat(),
+          ...extra,
+        };
+      }
+
+      function requestPreview(options = {}) {
+        post({ type: "preview", ...payload(), ...options });
+      }
+
+      function scheduleCommit() {
+        window.clearTimeout(commitTimer);
+        commitTimer = window.setTimeout(() => {
+          if (formatOnly) {
+            post({ type: "apply-format", format: currentFormat(), silent: true });
+            return;
+          }
+          requestPreview({ commit: true, silent: true, revealError: false });
+        }, 350);
+      }
+
+      function setFormulaFocus(active) {
+        exprBox.classList.toggle("is-picking", active);
+        post({ type: "formula-focus", active });
+      }
+
+      function keepFormulaFieldFocused() {
+        window.clearTimeout(blurTimer);
+        holdFormulaFocus = true;
+        exprBox.classList.add("is-picking");
+        exprDraft.focus();
+        setFormulaFocus(true);
+        window.setTimeout(() => {
+          holdFormulaFocus = false;
+        }, 500);
+      }
+
+      function expressionFilled() {
+        return getExpression().replace(/^=/, "").trim().length > 0;
+      }
+
+      function syncClearButton() {
+        clearExpr.hidden = formatOnly || !expressionFilled();
+      }
+
+      function disarmClearUndo() {
+        clearUndoArmed = false;
+        window.clearTimeout(clearUndoTimer);
+      }
+
+      function armClearUndo() {
+        clearUndoArmed = true;
+        window.clearTimeout(clearUndoTimer);
+        clearUndoTimer = window.setTimeout(disarmClearUndo, CLEAR_UNDO_MS);
+      }
+
+      function clearExpression() {
+        if (!expressionFilled()) return;
+        window.clearTimeout(commitTimer);
+        window.clearTimeout(blurTimer);
+        hideFormulaError();
+        post({ type: "clear-formula" });
+        armClearUndo();
+      }
+
+      function setFormat(format) {
+        kind.value = format?.kind ?? "number";
+        ensureSelectValue(locale, format?.locale ?? "en-US");
+        ensureSelectValue(currency, format?.currency ?? "USD");
+        fractionDigits.value =
+          format?.fractionDigits === undefined ? "" : String(format.fractionDigits);
+        syncFractionLook();
+      }
+
+      function showFormulaError(text) {
+        exprBox.classList.add("is-error");
+        exprError.hidden = false;
+        exprError.textContent = text || "Invalid formula";
+      }
+
+      function hideFormulaError() {
+        exprBox.classList.remove("is-error");
+        exprError.hidden = true;
+        exprError.textContent = "";
+      }
+
+      function setPanelMode(mode, frameCount) {
+        formatOnly = mode === "format-only";
+        formatOnlyBanner.hidden = !formatOnly;
+        formatOnlyBanner.textContent = formatOnly
+          ? `Formatting ${frameCount} frames`
+          : "";
+        exprSection.hidden = formatOnly;
+        syncClearButton();
+      }
+
+      onmessage = (event) => {
+        const msg = event.data.pluginMessage;
+        if (!msg) return;
+        if (msg.type === "error") {
+          disarmClearUndo();
+          showFormulaError(msg.message);
+          return;
+        }
+        if (msg.type === "clear-undone") {
+          disarmClearUndo();
+          return;
+        }
+        if (msg.type === "preview") {
+          previewError = !!msg.error;
+          if (msg.error) {
+            if (msg.revealError) showFormulaError(msg.formatted);
+            else hideFormulaError();
+            return;
+          }
+          hideFormulaError();
+          return;
+        }
+        if (msg.type === "insert-ref") {
+          formulaMode = true;
+          exprDraft.value = "";
+          renderTokens(msg.formula);
+          requestPreview({ revealError: false });
+          scheduleCommit();
+          keepFormulaFieldFocused();
+          return;
+        }
+        if (msg.type === "keep-formula-focus") {
+          keepFormulaFieldFocused();
+          return;
+        }
+        if (msg.type === "canvas-value") {
+          if (formulaMode) return;
+          if (document.activeElement === exprDraft) return;
+          exprDraft.value = msg.rawValue == null ? "" : String(msg.rawValue);
+          updateMode();
+          return;
+        }
+        if (msg.type !== "selection") return;
+        hideFormulaError();
+        previewError = false;
+        if (msg.mode === "empty" || (!msg.cell && msg.mode !== "format-only")) {
+          panel.hidden = true;
+          empty.hidden = false;
+          return;
+        }
+        empty.hidden = true;
+        panel.hidden = false;
+        if (msg.mode === "format-only") {
+          setPanelMode("format-only", msg.frameCount);
+          setFormat(msg.format);
+          hideFormulaError();
+          return;
+        }
+        setPanelMode("cell");
+        cellId.value = msg.cell.cellId;
+        if (msg.cell.formula) {
+          formulaMode = true;
+          exprDraft.value = "";
+          renderTokens(msg.cell.formula);
+        } else {
+          exitFormulaMode();
+          exprDraft.value = msg.cell.rawValue == null ? "" : String(msg.cell.rawValue);
+          updateMode();
+        }
+        setFormat(msg.cell.format);
+      };
+
+      exprBox.addEventListener("click", (event) => {
+        if (event.target.closest(".tag-remove")) return;
+        exprDraft.focus();
+      });
+      clearExpr.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        window.clearTimeout(blurTimer);
+      });
+      clearExpr.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        clearExpression();
+      });
+      window.addEventListener(
+        "keydown",
+        (event) => {
+          if (!clearUndoArmed) return;
+          if (
+            (event.metaKey || event.ctrlKey) &&
+            event.key.toLowerCase() === "z" &&
+            !event.shiftKey
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            disarmClearUndo();
+            post({ type: "undo-clear" });
+          }
+        },
+        true,
+      );
+      exprDraft.addEventListener("focus", () => {
+        window.clearTimeout(blurTimer);
+        setFormulaFocus(true);
+      });
+      exprDraft.addEventListener("blur", () => {
+        if (holdFormulaFocus) {
+          exprDraft.focus();
+          return;
+        }
+        blurTimer = window.setTimeout(() => {
+          if (holdFormulaFocus) {
+            exprDraft.focus();
+            return;
+          }
+          setFormulaFocus(false);
+          requestPreview({ commit: true, revealError: true, silent: true });
+        }, 400);
+      });
+      exprDraft.addEventListener("input", () => {
+        disarmClearUndo();
+        hideFormulaError();
+        if (!formulaMode && exprDraft.value.trimStart().startsWith("=")) {
+          enterFormulaMode();
+          exprDraft.value = exprDraft.value.trimStart().replace(/^=/, "").trimStart();
+          renderTokens("");
+        }
+        requestPreview({ revealError: false });
+        scheduleCommit();
+        syncClearButton();
+      });
+      exprDraft.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          requestPreview({ commit: true, revealError: true, silent: true });
+          return;
+        }
+        if (event.key !== "Backspace" || exprDraft.value) {
+          scheduleCommit();
+          return;
+        }
+        if (!formulaMode) return;
+        const parts = parseParts(canonicalFormula);
+        if (parts.length === 0) {
+          event.preventDefault();
+          exitFormulaMode();
+          requestPreview({ revealError: false });
+          scheduleCommit();
+          return;
+        }
+        event.preventDefault();
+        parts.pop();
+        renderTokens(joinParts(parts));
+        requestPreview({ revealError: false });
+        scheduleCommit();
+      });
+
+      kind.addEventListener("change", () => {
+        requestPreview({ revealError: false });
+        scheduleCommit();
+      });
+      fractionDigits.addEventListener("input", () => {
+        syncFractionLook();
+        requestPreview({ revealError: false });
+        scheduleCommit();
+      });
+      for (const el of [cellId, currency, locale]) {
+        el.addEventListener("change", () => {
+          requestPreview({ revealError: false });
+          scheduleCommit();
+        });
+      }
+
+      panel.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (formatOnly) {
+          post({ type: "apply-format", format: currentFormat() });
+          return;
+        }
+        requestPreview({ commit: true, revealError: true, silent: true });
+      });
+
+      post({ type: "ready" });
+    </script>
+  </body>
+</html>

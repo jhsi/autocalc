@@ -1,23 +1,16 @@
-import { identTok } from "../../tests/helpers.ts";
 import type { DocumentAdapter } from "../adapters/document-adapter.ts";
-import { errorLabel, isComputeError, notImplemented, valueError } from "./errors.ts";
-import { evaluateFormula, getCellValue } from "./evaluator.ts";
+import { errorLabel, isComputeError, notImplemented } from "./errors.ts";
+import { getCellValue } from "./evaluator.ts";
 import { formatValue } from "./formatter.ts";
-import { tokenize } from "./tokenizer.ts";
 import type { CellChange, CellId, CellResult, CellValue } from "./types.ts";
 
 /**
  * Orchestrates document reads/writes, evaluation, and recalculation.
  * Knows nothing about Figma — only DocumentAdapter.
  *
- * Suggested shape (you implement the algorithms):
- * - getValue: literal → rawValue; formula → evaluateFormula
- * - setValue: write a literal, clear formula, recompute dependents
- * - setFormula: write a formula, recompute this cell and dependents
- * - dependency queries: delegate to dependencies.ts
- *
- * setValue / setFormula should return every cell whose computed value
- * changed, so a future Figma adapter can update only those text nodes.
+ * setValue / setFormula persist through the adapter, then return every cell
+ * whose computed value should be refreshed so a Figma adapter can update
+ * only those text nodes (currently the whole document, naively).
  */
 export class ComputationEngine {
   private doc;
@@ -26,8 +19,15 @@ export class ComputationEngine {
     this.doc = document;
   }
 
-  getValue(_id: CellId): CellResult {
-    return getCellValue(_id, this.doc);
+  getValue(id: CellId): CellResult {
+    try {
+      return getCellValue(id, this.doc);
+    } catch (error) {
+      if (isComputeError(error)) {
+        return error;
+      }
+      throw error;
+    }
   }
 
   getFormattedValue(id: CellId): string {
@@ -38,33 +38,14 @@ export class ComputationEngine {
     return formatValue(result, this.doc.getCell(id)?.format);
   }
 
-  setValue(_id: CellId, _value: CellValue): CellChange[] {
-    // naive: rerender everything
-    return this.doc.getAllCells().map((cell) => {
-      if (cell.id === _id) {
-        return {
-          id: _id,
-          value: _value
-        } satisfies CellChange
-      } else if (cell.formula && hasDependency(cell.formula, _id)) {
-        return {
-          id: cell.id,
-          value: getCellValue(cell.id, this.doc),
-        }
-      } else {
-        return null;
-      }
-    }).filter(c => c !== null)
+  setValue(id: CellId, value: CellValue): CellChange[] {
+    this.doc.setRawValue(id, value);
+    return this.snapshot();
   }
 
-  setFormula(_id: CellId, _formula: string | undefined): CellChange[] {
-    // naive: rerender everything
-    return this.doc.getAllCells().map((cell) => {
-      return {
-        id: cell.id,
-        value: getCellValue(cell.id, this.doc),
-      }
-    })
+  setFormula(id: CellId, formula: string | undefined): CellChange[] {
+    this.doc.setFormula(id, formula);
+    return this.snapshot();
   }
 
   directDependenciesOf(_id: CellId): CellId[] {
@@ -82,8 +63,11 @@ export class ComputationEngine {
   dependentsOf(_id: CellId): CellId[] {
     notImplemented("ComputationEngine.dependentsOf", "src/core/engine.ts");
   }
-}
 
-function hasDependency(srcId: string, depId: string) {
-  return true; // naively recalculate everything
+  private snapshot(): CellChange[] {
+    return this.doc.getAllCells().map((cell) => ({
+      id: cell.id,
+      value: this.getValue(cell.id),
+    }));
+  }
 }

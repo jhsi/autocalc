@@ -1,0 +1,707 @@
+/// <reference types="@figma/plugin-typings" />
+
+declare const __html__: string;
+
+import { ComputationEngine } from "../core/engine.ts";
+import { errorLabel, isComputeError } from "../core/errors.ts";
+import { evaluateFormula } from "../core/evaluator.ts";
+import { formatValue } from "../core/formatter.ts";
+import type { CellFormat } from "../core/types.ts";
+import { FigmaDocumentAdapter } from "./adapter.ts";
+import { cellIdFromBadge, hideIdBadges, showIdBadges } from "./badges.ts";
+import { appendCellRef, formulaCellIds } from "./formula-refs.ts";
+import { enclosingComponentOrFrame, hideFormulaHints, showFormulaHints } from "./highlight.ts";
+import { nearestText } from "./nearest-text.ts";
+import {
+  cellIdFromLayerName,
+  isOverlayNode,
+  normalizeFormula,
+  parseCharactersAsValue,
+  parseLiteralInput,
+} from "./plugin-data.ts";
+import { setTextCharacters } from "./text.ts";
+
+type UiMessage =
+  | { type: "ready" }
+  | { type: "formula-focus"; active: boolean }
+  | {
+      type: "preview";
+      cellId: string;
+      formula: string;
+      rawValue: string;
+      format: CellFormat | null;
+      commit?: boolean;
+      silent?: boolean;
+      revealError?: boolean;
+    }
+  | {
+      type: "apply";
+      cellId: string;
+      formula: string;
+      rawValue: string;
+      format: CellFormat | null;
+      silent?: boolean;
+    }
+  | { type: "apply-format"; format: CellFormat; silent?: boolean }
+  | { type: "clear-formula" }
+  | { type: "undo-clear" }
+  | { type: "unlink" };
+
+const CLEAR_UNDO_MS = 5000;
+let clearUndoUntil = 0;
+let clearNotify: NotificationHandler | undefined;
+
+let activeTextId: string | undefined;
+let draftFormula = "";
+let formulaActive = false;
+let ignoreSelection = false;
+let keepFormulaUntil = 0;
+
+let writingText = false;
+let watchedPage: PageNode | undefined;
+
+figma.showUI(__html__, { width: 320, height: 380, themeColors: true });
+
+figma.on("selectionchange", () => {
+  handleSelectionChange();
+});
+
+figma.on("currentpagechange", () => {
+  watchCurrentPage();
+});
+
+figma.on("close", () => {
+  unwatchCurrentPage();
+  void hideIdBadges();
+  void hideFormulaHints();
+});
+
+watchCurrentPage();
+
+figma.ui.onmessage = async (msg: UiMessage) => {
+  try {
+    switch (msg.type) {
+      case "ready":
+        postSelection();
+        return;
+      case "formula-focus":
+        if (!msg.active && Date.now() < keepFormulaUntil) {
+          formulaActive = true;
+          await syncBadges();
+          figma.ui.postMessage({ type: "keep-formula-focus" });
+          return;
+        }
+        formulaActive = msg.active;
+        await syncBadges();
+        return;
+      case "preview":
+        draftFormula = msg.formula;
+        await postPreview(msg);
+        void highlightForActive(msg.formula);
+        return;
+      case "apply":
+        await applyCell(msg, { silent: Boolean(msg.silent) });
+        return;
+      case "apply-format":
+        await applyFormatToSelectedFrames(msg.format, { silent: Boolean(msg.silent) });
+        return;
+      case "clear-formula":
+        await clearFormulaOnSelection();
+        return;
+      case "undo-clear":
+        undoClear();
+        return;
+      case "unlink":
+        await unlinkSelection();
+        return;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    figma.ui.postMessage({ type: "error", message });
+    if (msg.type !== "preview") {
+      figma.notify(message, { error: true });
+    }
+  }
+};
+
+function handleSelectionChange(): void {
+  if (ignoreSelection) {
+    return;
+  }
+
+  const raw = [...figma.currentPage.selection];
+  const badgeIds = raw
+    .map((node) => cellIdFromBadge(node))
+    .filter((id): id is string => Boolean(id));
+  const selection = raw.filter((node) => !isOverlayNode(node));
+  const active = activeText();
+  const picking = formulaActive || Date.now() < keepFormulaUntil;
+
+  if (picking && active && selection.filter(isFrameLike).length < 2) {
+    const adapter = new FigmaDocumentAdapter();
+    let formula = draftFormula || adapter.cellFromNode(active).formula || "";
+    const before = formula;
+    for (const badgeId of badgeIds) {
+      formula = appendCellRef(formula, badgeId);
+    }
+    for (const node of selection) {
+      if (node.id === active.id) {
+        continue;
+      }
+      const text = nearestText(node);
+      if (text && text.id !== active.id) {
+        formula = appendCellRef(formula, adapter.cellFromNode(text).id);
+      }
+    }
+    if (formula !== before) {
+      draftFormula = formula;
+      stayInFormulaPick();
+      figma.ui.postMessage({ type: "insert-ref", formula });
+      restoreFormulaSelection(active);
+    } else if (badgeIds.length > 0) {
+      stayInFormulaPick();
+      figma.ui.postMessage({ type: "keep-formula-focus" });
+      restoreFormulaSelection(active);
+    }
+    void hintFormulaMembers(active, formula);
+    return;
+  }
+
+  if (raw.length > 0 && raw.every((node) => isOverlayNode(node))) {
+    if (active && picking) {
+      stayInFormulaPick();
+      figma.ui.postMessage({ type: "keep-formula-focus" });
+      restoreFormulaSelection(active);
+    }
+    return;
+  }
+
+  const frames = selection.filter(isFrameLike);
+  if (frames.length >= 2) {
+    activeTextId = undefined;
+    void hideIdBadges();
+    void hideFormulaHints();
+    figma.ui.postMessage({
+      type: "selection",
+      mode: "format-only",
+      frameCount: frames.length,
+      format: formatFromFrames(frames),
+    });
+    return;
+  }
+
+  const directText = selection.find(
+    (node): node is TextNode =>
+      node.type === "TEXT" && !isOverlayNode(node) && !cellIdFromBadge(node),
+  );
+  if (
+    directText &&
+    selection.length === 1 &&
+    hasFormula(directText)
+  ) {
+    const container = enclosingComponentOrFrame(directText);
+    if (container && container.id !== directText.id) {
+      activeTextId = directText.id;
+      figma.currentPage.selection = [container];
+      return;
+    }
+  }
+
+  const text = resolveCellText(selection);
+  activeTextId = text?.id;
+  postSelection();
+}
+
+function stayInFormulaPick(): void {
+  formulaActive = true;
+  keepFormulaUntil = Date.now() + 800;
+}
+
+function restoreFormulaSelection(active: TextNode): void {
+  const current = figma.currentPage.selection;
+  if (current.length === 1 && current[0]?.id === active.id) {
+    return;
+  }
+  ignoreSelection = true;
+  figma.currentPage.selection = [active];
+  ignoreSelection = false;
+}
+
+function hasFormula(node: TextNode): boolean {
+  return Boolean(new FigmaDocumentAdapter().cellFromNode(node).formula);
+}
+
+function isCellText(node: SceneNode): node is TextNode {
+  return (
+    node.type === "TEXT" && !isOverlayNode(node) && !cellIdFromBadge(node)
+  );
+}
+
+function resolveCellText(selection: SceneNode[]): TextNode | undefined {
+  const direct = selection.find(isCellText);
+  if (direct) {
+    return direct;
+  }
+
+  const frame = selection[0];
+  if (selection.length !== 1 || !frame || !isFrameLike(frame)) {
+    return undefined;
+  }
+
+  const texts = textNodesInFrames([frame]);
+  if (activeTextId) {
+    const kept = texts.find((node) => node.id === activeTextId);
+    if (kept) {
+      return kept;
+    }
+  }
+
+  const adapter = new FigmaDocumentAdapter();
+  return (
+    texts.find((node) => Boolean(adapter.cellFromNode(node).formula)) ?? texts[0]
+  );
+}
+
+function activeText(): TextNode | undefined {
+  if (!activeTextId) {
+    return undefined;
+  }
+  const node = figma.currentPage.findOne((candidate) => candidate.id === activeTextId);
+  return node?.type === "TEXT" ? node : undefined;
+}
+
+function selectedText(): TextNode | undefined {
+  if (activeTextId) {
+    const active = activeText();
+    if (active) {
+      return active;
+    }
+  }
+  return resolveCellText(
+    [...figma.currentPage.selection].filter((node) => !isOverlayNode(node)),
+  );
+}
+
+function postSelection(): void {
+  const node = selectedText();
+  if (!node) {
+    void hideIdBadges();
+    void hideFormulaHints();
+    figma.ui.postMessage({ type: "selection", mode: "empty", cell: null });
+    return;
+  }
+
+  activeTextId = node.id;
+  const adapter = new FigmaDocumentAdapter();
+  const engine = new ComputationEngine(adapter);
+  const cell = adapter.cellFromNode(node);
+  const managed = adapter.isManaged(node);
+  const formatted = managed ? engine.getFormattedValue(cell.id) : node.characters;
+  const rawDisplay =
+    cell.rawValue === undefined || cell.rawValue === null
+      ? ""
+      : String(cell.rawValue);
+
+  draftFormula = cell.formula ?? "";
+  void hintFormulaMembers(node, draftFormula);
+  void syncBadges();
+
+  const liveValue = parseCharactersAsValue(node.characters);
+  figma.ui.postMessage({
+    type: "selection",
+    mode: "cell",
+    cell: {
+      name: node.name,
+      cellId: cell.id,
+      managed,
+      formula: cell.formula ?? "",
+      rawValue: cell.formula
+        ? rawDisplay
+        : String(liveValue ?? rawDisplay),
+      format: cell.format ?? null,
+      formatted,
+    },
+  });
+}
+
+async function postPreview(msg: {
+  cellId: string;
+  formula: string;
+  rawValue: string;
+  format: CellFormat | null;
+  commit?: boolean;
+  silent?: boolean;
+  revealError?: boolean;
+}): Promise<void> {
+  const { formatted, error } = computePreview(msg);
+  figma.ui.postMessage({
+    type: "preview",
+    formatted,
+    error,
+    revealError: Boolean(msg.revealError),
+  });
+  if (msg.commit && !error && hasExpression(msg)) {
+    await applyCell(msg, {
+      silent: msg.silent !== false,
+      recordHistory: Boolean(msg.revealError) || msg.silent === false,
+    });
+  }
+}
+
+function computePreview(msg: {
+  formula: string;
+  rawValue: string;
+  format: CellFormat | null;
+}): { formatted: string; error: boolean } {
+  const adapter = new FigmaDocumentAdapter();
+  const format = msg.format ?? undefined;
+  const formula = normalizeFormula(msg.formula);
+  try {
+    const result = formula
+      ? evaluateFormula(formula, adapter)
+      : parseLiteralInput(msg.rawValue);
+    if (isComputeError(result)) {
+      return { formatted: errorLabel(result), error: true };
+    }
+    return { formatted: formatValue(result, format), error: false };
+  } catch (error) {
+    if (isComputeError(error)) {
+      return { formatted: errorLabel(error), error: true };
+    }
+    throw error;
+  }
+}
+
+function hasExpression(msg: { formula: string; rawValue: string }): boolean {
+  return Boolean(normalizeFormula(msg.formula) || String(msg.rawValue ?? "").trim());
+}
+
+async function applyCell(
+  msg: {
+    cellId: string;
+    formula: string;
+    rawValue: string;
+    format: CellFormat | null;
+  },
+  options?: { silent?: boolean; recordHistory?: boolean },
+): Promise<void> {
+  const node = selectedText();
+  if (!node) {
+    throw new Error("Select a text layer first.");
+  }
+
+  const silent = Boolean(options?.silent);
+  const recordHistory = options?.recordHistory ?? !silent;
+  if (!silent) {
+    await hideIdBadges();
+    await hideFormulaHints();
+  }
+
+  const cellId = normalizeCellId(msg.cellId, node);
+  const adapter = new FigmaDocumentAdapter();
+  adapter.attach(node, cellId);
+  adapter.setFormat(cellId, msg.format ?? undefined);
+
+  const engine = new ComputationEngine(adapter);
+  const formula = normalizeFormula(msg.formula);
+  if (formula) {
+    engine.setFormula(cellId, formula);
+  } else {
+    engine.setValue(cellId, parseLiteralInput(msg.rawValue));
+  }
+
+  await recalculatePage(adapter, engine);
+  if (recordHistory) {
+    figma.commitUndo();
+  }
+  if (!silent) {
+    figma.notify(`Updated ${cellId}`);
+    postSelection();
+  }
+}
+
+async function clearFormulaOnSelection(): Promise<void> {
+  const node = selectedText();
+  if (!node) {
+    throw new Error("Select a text layer first.");
+  }
+
+  figma.commitUndo();
+  await hideIdBadges();
+  await hideFormulaHints();
+
+  const adapter = new FigmaDocumentAdapter();
+  const engine = new ComputationEngine(adapter);
+  const cell = adapter.cellFromNode(node);
+  adapter.attach(node, cell.id);
+
+  if (cell.formula) {
+    const result = engine.getValue(cell.id);
+    const kept = isComputeError(result)
+      ? parseCharactersAsValue(node.characters)
+      : result;
+    engine.setValue(cell.id, kept);
+  } else {
+    engine.setValue(cell.id, null);
+  }
+
+  await recalculatePage(adapter, engine);
+  figma.commitUndo();
+
+  clearUndoUntil = Date.now() + CLEAR_UNDO_MS;
+  clearNotify?.cancel();
+  clearNotify = figma.notify("Formula cleared", {
+    timeout: CLEAR_UNDO_MS,
+    button: {
+      text: "Undo",
+      action: () => {
+        undoClear();
+      },
+    },
+  });
+
+  postSelection();
+}
+
+function undoClear(): void {
+  if (Date.now() > clearUndoUntil) {
+    return;
+  }
+  clearUndoUntil = 0;
+  clearNotify?.cancel();
+  clearNotify = undefined;
+  figma.triggerUndo();
+  figma.ui.postMessage({ type: "clear-undone" });
+  postSelection();
+}
+
+async function unlinkSelection(): Promise<void> {
+  const node = selectedText();
+  if (!node) {
+    throw new Error("Select a text layer first.");
+  }
+  await hideIdBadges();
+  await hideFormulaHints();
+  const adapter = new FigmaDocumentAdapter();
+  adapter.detach(node);
+  figma.commitUndo();
+  figma.notify("Unlinked layer");
+  postSelection();
+}
+
+/** Re-evaluate and rewrite every managed cell on the current page. */
+async function recalculatePage(
+  adapter: FigmaDocumentAdapter,
+  engine: ComputationEngine,
+  skipNodeId?: string,
+): Promise<void> {
+  writingText = true;
+  try {
+    for (const node of adapter.managedTextNodes()) {
+      if (node.id === skipNodeId) {
+        continue;
+      }
+      const cell = adapter.cellFromNode(node);
+      await setTextCharacters(node, engine.getFormattedValue(cell.id));
+    }
+  } finally {
+    writingText = false;
+  }
+}
+
+async function syncBadges(): Promise<void> {
+  if (!formulaActive) {
+    await hideIdBadges();
+    return;
+  }
+  await hideFormulaHints();
+  const node = activeText() ?? selectedText();
+  if (!node) {
+    await hideIdBadges();
+    return;
+  }
+  await showIdBadges(new FigmaDocumentAdapter(), node);
+}
+
+function highlightForActive(formula: string): void {
+  const node = activeText() ?? selectedText();
+  if (node) {
+    void hintFormulaMembers(node, formula);
+  }
+}
+
+async function hintFormulaMembers(
+  node: TextNode,
+  formulaSource: string,
+): Promise<void> {
+  if (formulaActive) {
+    await hideFormulaHints();
+    return;
+  }
+
+  const adapter = new FigmaDocumentAdapter();
+  const formula = normalizeFormula(formulaSource);
+  if (!formula) {
+    await hideFormulaHints();
+    return;
+  }
+
+  const activeContainer = enclosingComponentOrFrame(node);
+  const selectedIds = new Set(figma.currentPage.selection.map((sceneNode) => sceneNode.id));
+  const targets: { node: SceneNode; label: string }[] = [];
+  for (const id of formulaCellIds(formula)) {
+    const ref = adapter.findTextNode(id);
+    if (!ref || ref.id === node.id) {
+      continue;
+    }
+    const refContainer = enclosingComponentOrFrame(ref);
+    const hinted =
+      refContainer && refContainer.id !== activeContainer?.id ? refContainer : ref;
+    if (selectedIds.has(hinted.id) || hinted.id === activeContainer?.id) {
+      continue;
+    }
+    targets.push({ node: hinted, label: id });
+  }
+  await showFormulaHints(targets);
+}
+
+function isFrameLike(node: SceneNode): boolean {
+  return (
+    node.type === "FRAME" ||
+    node.type === "COMPONENT" ||
+    node.type === "COMPONENT_SET" ||
+    node.type === "INSTANCE" ||
+    node.type === "SECTION"
+  );
+}
+
+function textNodesInFrames(frames: SceneNode[]): TextNode[] {
+  const texts: TextNode[] = [];
+  for (const frame of frames) {
+    if (!("findAllWithCriteria" in frame)) {
+      continue;
+    }
+    for (const node of frame.findAllWithCriteria({ types: ["TEXT"] })) {
+      if (!isOverlayNode(node) && !cellIdFromBadge(node)) {
+        texts.push(node);
+      }
+    }
+  }
+  return texts;
+}
+
+function formatFromFrames(frames: SceneNode[]): CellFormat | null {
+  const adapter = new FigmaDocumentAdapter();
+  for (const node of textNodesInFrames(frames)) {
+    const format = adapter.cellFromNode(node).format;
+    if (format) {
+      return format;
+    }
+  }
+  return null;
+}
+
+async function applyFormatToSelectedFrames(
+  format: CellFormat,
+  options?: { silent?: boolean },
+): Promise<void> {
+  const frames = figma.currentPage.selection.filter(isFrameLike);
+  const texts = textNodesInFrames(frames);
+  if (texts.length === 0) {
+    throw new Error("No text layers in the selected frames.");
+  }
+
+  const adapter = new FigmaDocumentAdapter();
+  const engine = new ComputationEngine(adapter);
+  for (const node of texts) {
+    const cell = adapter.cellFromNode(node);
+    adapter.attach(node, cell.id);
+    if (cell.formula) {
+      adapter.setFormula(cell.id, cell.formula);
+    } else {
+      adapter.setRawValue(
+        cell.id,
+        cell.rawValue ?? parseCharactersAsValue(node.characters),
+      );
+    }
+    adapter.setFormat(cell.id, format);
+    writingText = true;
+    try {
+      await setTextCharacters(node, engine.getFormattedValue(cell.id));
+    } finally {
+      writingText = false;
+    }
+  }
+  await recalculatePage(adapter, engine);
+  figma.commitUndo();
+  if (!options?.silent) {
+    figma.notify(`Formatted ${texts.length} layers`);
+  }
+}
+
+function normalizeCellId(input: string, node: TextNode): string {
+  const trimmed = input.trim();
+  return trimmed.length > 0
+    ? cellIdFromLayerName(trimmed)
+    : cellIdFromLayerName(node.name);
+}
+
+function watchCurrentPage(): void {
+  unwatchCurrentPage();
+  watchedPage = figma.currentPage;
+  watchedPage.on("nodechange", handleNodeChange);
+}
+
+function unwatchCurrentPage(): void {
+  if (watchedPage) {
+    watchedPage.off("nodechange", handleNodeChange);
+    watchedPage = undefined;
+  }
+}
+
+function handleNodeChange(event: NodeChangeEvent): void {
+  if (writingText || formulaActive) {
+    return;
+  }
+  void syncCanvasLiteral(event);
+}
+
+async function syncCanvasLiteral(event: NodeChangeEvent): Promise<void> {
+  const node = selectedText();
+  if (!node || node.removed) {
+    return;
+  }
+
+  const adapter = new FigmaDocumentAdapter();
+  const cell = adapter.cellFromNode(node);
+  if (cell.formula) {
+    return;
+  }
+
+  const changed = event.nodeChanges.some((change) => {
+    if (change.type !== "PROPERTY_CHANGE") {
+      return false;
+    }
+    if (change.node.id !== node.id) {
+      return false;
+    }
+    return change.properties.includes("characters");
+  });
+  if (!changed) {
+    return;
+  }
+
+  const value = parseCharactersAsValue(node.characters);
+  if (adapter.isManaged(node)) {
+    adapter.setRawValue(cell.id, value);
+  }
+
+  const editing = figma.currentPage.selectedTextRange?.node.id === node.id;
+  const engine = new ComputationEngine(adapter);
+  await recalculatePage(adapter, engine, editing ? node.id : undefined);
+
+  figma.ui.postMessage({
+    type: "canvas-value",
+    rawValue: value === null ? "" : String(value),
+  });
+}

@@ -7,10 +7,14 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/figma/tsconfig.json",
+    "figma:build": "node src/figma/build.mjs",
+    "figma:watch": "node src/figma/build.mjs --watch"
   },
   "devDependencies": {
+    "@figma/plugin-typings": "^1.121.0",
     "@types/node": "^26.4.0",
+    "esbuild": "^0.25.10",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }

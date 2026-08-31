@@ -14,5 +14,13 @@
     "noUncheckedIndexedAccess": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "tests"]
+  "include": ["src", "tests"],
+  "exclude": [
+    "src/figma/adapter.ts",
+    "src/figma/code.ts",
+    "src/figma/text.ts",
+    "src/figma/highlight.ts",
+    "src/figma/nearest-text.ts",
+    "src/figma/badges.ts"
+  ]
 }
