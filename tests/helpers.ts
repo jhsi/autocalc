@@ -11,7 +11,7 @@ export function tok(
   lexeme: string,
   literal: number | string | null = null,
 ): Token {
-  return { type, lexeme, literal, start: 0 };
+  return { type, lexeme, literal };
 }
 
 export const numberTok = (n: number, lexeme = String(n)): Token =>
@@ -44,20 +44,12 @@ export function createDoc(
   groups: Array<{ id: string; name?: string; children: string[] }> = [],
 ): MemoryDocumentAdapter {
   const doc = new MemoryDocumentAdapter();
-  for (const group of groups) {
-    doc.addGroup({
-      id: group.id,
-      name: group.name ?? group.id,
-      children: [...group.children],
-    });
-  }
   for (const cell of cells) {
     doc.addCell({
       id: cell.id,
       name: cell.name ?? cell.id,
       rawValue: cell.rawValue,
       formula: cell.formula,
-      parentId: cell.parentId,
       format: cell.format,
     });
   }

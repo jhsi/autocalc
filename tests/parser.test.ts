@@ -108,7 +108,7 @@ describe("Milestone 1 — parser (literals and arithmetic)", () => {
 });
 
 // Remove `.skip` after Milestone 1 (literals and arithmetic) is green.
-describe.skip("Milestone 2 — parser (cell references)", () => {
+describe("Milestone 2 — parser (cell references)", () => {
   it("parses a bare identifier as a reference to that id", () => {
     expect(parse(tokens(identTok("a")))).toEqual({ kind: "ref", id: "a" });
   });
@@ -133,7 +133,7 @@ describe.skip("Milestone 2 — parser (cell references)", () => {
 });
 
 // Remove `.skip` after Milestone 2 (cell references) is green.
-describe.skip("Milestone 3 — parser (function calls)", () => {
+describe("Milestone 3 — parser (function calls)", () => {
   it("parses SUM(a, b, c)", () => {
     expect(
       parse(

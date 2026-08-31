@@ -1,8 +1,8 @@
 import type { BinaryExpr, CallExpr, Expr, NumberExpr, ReferenceExpr } from "./ast.ts";
 import type { DocumentAdapter } from "../adapters/document-adapter.ts";
-import { isComputeError, notImplemented } from "./errors.ts";
+import { divZeroError, isComputeError, nameError, notImplemented, refError, valueError } from "./errors.ts";
 import type { CellId, CellResult } from "./types.ts";
-import { parseFormula } from "./parser.ts";
+import { parseFormula, type EvaluatorFunction } from "./parser.ts";
 
 /**
  * Optional evaluation state. Used later for cycle detection.
@@ -32,7 +32,7 @@ export function evaluate(
   _doc?: DocumentAdapter,
   _state?: EvalState,
 ): CellResult {
-  const evaluator = new Evaluator(_expr);
+  const evaluator = new Evaluator(_expr, _doc);
   return evaluator.evaluate();
 }
 
@@ -60,16 +60,16 @@ class Evaluator {
   private ast;
   private doc;
 
-  constructor(_expr: Expr, doc: DocumentAdapter) {
+  constructor(_expr: Expr, _doc?: DocumentAdapter) {
     this.ast = _expr;
-    this.doc = doc;
+    this.doc = _doc;
   }
 
   evaluate() {
     return this.evaluateFormula(this.ast);
   }
 
-  evaluateFormula(n: Expr): number {
+  evaluateFormula(n: Expr): any {
     switch (n.kind) {
       case "binary":
         return this.evaluateBinary(n);
@@ -78,9 +78,18 @@ class Evaluator {
       case "number":
         return (n as NumberExpr).value;
       case "ref":
-        const id = (this.ast as ReferenceExpr).id;
-        const group = this.doc.getGroup(id);
-        return 0;
+        const id = (n as ReferenceExpr).id;
+        const cell = this.doc?.getCell(id)
+        if (cell !== undefined) {
+          if (cell.rawValue != undefined) {
+            return cell.rawValue;
+          } else {
+            throw valueError(id);
+          }
+        } else {
+          // TODO: handle groups
+          throw refError(id);
+        }
       default:
         return 0;
     }
@@ -93,7 +102,7 @@ class Evaluator {
       case "/":
         const right = this.evaluateFormula(n.right);
         if (right === 0) {
-          throw new EvalError("DIV_ZERO")
+          throw divZeroError();
         }
         return this.evaluateFormula(n.left) / right;
       case "-":
@@ -107,15 +116,29 @@ class Evaluator {
 
   evaluateCall(n: CallExpr): number {
     switch (n.name) {
-      case "sum": // TODO: constants
+      case "SUM" satisfies EvaluatorFunction:
         return n.args.reduce((sum, expr) => sum + this.evaluateFormula(expr), 0);
-      case "avg":
+      case "AVG" satisfies EvaluatorFunction:
         if (n.args.length === 0) {
-          throw new EvalError("DIV_ZERO")
+          throw divZeroError();
         }
         const sum = n.args.reduce((sum, expr) => sum + this.evaluateFormula(expr), 0);
         return sum / n.args.length;
+      case "MIN" satisfies EvaluatorFunction:
+        return n.args.map((expr) => this.evaluateFormula(expr)).reduce((minVal, val) => {
+          if (val <= minVal) {
+            return val;
+          }
+          return minVal;
+        }, Infinity);
+      case "MAX" satisfies EvaluatorFunction:
+        return n.args.map((expr) => this.evaluateFormula(expr)).reduce((maxVal, val) => {
+          if (val >= maxVal) {
+            return val;
+          }
+          return maxVal;
+        }, -Infinity);
     }
-    throw new EvalError("Undefined function");
+    throw nameError(n.name);
   }
 }

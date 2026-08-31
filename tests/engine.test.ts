@@ -3,8 +3,8 @@ import { ComputationEngine } from "../src/core/engine.ts";
 import { isComputeError } from "../src/core/errors.ts";
 import { createDoc, expectError, expectValue } from "./helpers.ts";
 
-// Remove `.skip` after Milestone 4 (groups) is green.
-describe.skip("Milestone 5 — formulas stored on cells", () => {
+// Remove `.skip` after Milestone 3 is green.
+describe("Milestone 5 — formulas stored on cells", () => {
   it("engine.getValue returns a literal cell's rawValue", () => {
     const doc = createDoc([
       { id: "jan", name: "January", rawValue: 100 },

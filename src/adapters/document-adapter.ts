@@ -1,4 +1,4 @@
-import type { Cell, CellGroup, CellId, CellValue } from "../core/types.ts";
+import type { Cell, CellId, CellValue } from "../core/types.ts";
 
 /**
  * Persistence-agnostic document surface.
@@ -9,11 +9,7 @@ import type { Cell, CellGroup, CellId, CellValue } from "../core/types.ts";
  */
 export interface DocumentAdapter {
   getCell(id: CellId): Cell | undefined;
-  getGroup(id: string): CellGroup | undefined;
-  /** Child ids of a group. Empty array if id is not a group. */
-  getChildren(id: string): string[];
   getAllCells(): Cell[];
-  getAllGroups(): CellGroup[];
   /** Store a literal and clear any formula on that cell. */
   setRawValue(id: CellId, value: CellValue): void;
   /** Store a formula and clear the literal on that cell. */

@@ -160,7 +160,15 @@ class Parser {
   }
 }
 
+const FUNCTIONS = {
+  'SUM': true,
+  'AVG': true,
+  'MIN': true,
+  'MAX': true,
+}
+
+export type EvaluatorFunction = keyof typeof FUNCTIONS;
 
 function isSupportedFn(name: string) {
-  return name === "sum" || name === "avg";
+  return FUNCTIONS[name as EvaluatorFunction] === true
 }

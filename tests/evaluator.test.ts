@@ -54,7 +54,7 @@ describe("Milestone 1 — evaluator (literals and arithmetic)", () => {
 });
 
 // Remove `.skip` after Milestone 1 (literals and arithmetic) is green.
-describe.skip("Milestone 2 — evaluator (cell references)", () => {
+describe("Milestone 2 — evaluator (cell references)", () => {
   const doc = () =>
     createDoc([
       { id: "a", rawValue: 10 },
@@ -84,7 +84,7 @@ describe.skip("Milestone 2 — evaluator (cell references)", () => {
 });
 
 // Remove `.skip` after Milestone 2 (cell references) is green.
-describe.skip("Milestone 3 — evaluator (functions)", () => {
+describe("Milestone 3 — evaluator (functions)", () => {
   const doc = () =>
     createDoc([
       { id: "a", rawValue: 10 },

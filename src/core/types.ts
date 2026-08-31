@@ -40,16 +40,7 @@ export interface Cell {
   rawValue?: CellValue;
   /** Formula source text when this cell is computed. */
   formula?: string;
-  /** Optional parent group id. */
-  parentId?: string;
   format?: CellFormat;
-}
-
-export interface CellGroup {
-  id: string;
-  name: string;
-  /** Child cell ids and/or nested group ids. Order is preserved. */
-  children: string[];
 }
 
 /** One cell whose displayed value changed after a mutation. */
