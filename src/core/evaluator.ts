@@ -1,4 +1,4 @@
-import type { Expr } from "./ast.ts";
+import type { BinaryExpr, CallExpr, Expr, NumberExpr, ReferenceExpr } from "./ast.ts";
 import type { DocumentAdapter } from "../adapters/document-adapter.ts";
 import { isComputeError, notImplemented } from "./errors.ts";
 import type { CellId, CellResult } from "./types.ts";
@@ -32,7 +32,8 @@ export function evaluate(
   _doc?: DocumentAdapter,
   _state?: EvalState,
 ): CellResult {
-  notImplemented("evaluate", "src/core/evaluator.ts");
+  const evaluator = new Evaluator(_expr);
+  return evaluator.evaluate();
 }
 
 /**
@@ -52,5 +53,69 @@ export function evaluateFormula(
       return error;
     }
     throw error;
+  }
+}
+
+class Evaluator {
+  private ast;
+  private doc;
+
+  constructor(_expr: Expr, doc: DocumentAdapter) {
+    this.ast = _expr;
+    this.doc = doc;
+  }
+
+  evaluate() {
+    return this.evaluateFormula(this.ast);
+  }
+
+  evaluateFormula(n: Expr): number {
+    switch (n.kind) {
+      case "binary":
+        return this.evaluateBinary(n);
+      case "call":
+        return this.evaluateCall(n);
+      case "number":
+        return (n as NumberExpr).value;
+      case "ref":
+        const id = (this.ast as ReferenceExpr).id;
+        const group = this.doc.getGroup(id);
+        return 0;
+      default:
+        return 0;
+    }
+  }
+
+  evaluateBinary(n: BinaryExpr): number {
+    switch (n.op) {
+      case "*":
+        return this.evaluateFormula(n.left) * this.evaluateFormula(n.right);
+      case "/":
+        const right = this.evaluateFormula(n.right);
+        if (right === 0) {
+          throw new EvalError("DIV_ZERO")
+        }
+        return this.evaluateFormula(n.left) / right;
+      case "-":
+        return this.evaluateFormula(n.left) - this.evaluateFormula(n.right);
+      case "+":
+        return this.evaluateFormula(n.left) + this.evaluateFormula(n.right);
+      default:
+        throw new EvalError("Undefined operator");
+    }
+  }
+
+  evaluateCall(n: CallExpr): number {
+    switch (n.name) {
+      case "sum": // TODO: constants
+        return n.args.reduce((sum, expr) => sum + this.evaluateFormula(expr), 0);
+      case "avg":
+        if (n.args.length === 0) {
+          throw new EvalError("DIV_ZERO")
+        }
+        const sum = n.args.reduce((sum, expr) => sum + this.evaluateFormula(expr), 0);
+        return sum / n.args.length;
+    }
+    throw new EvalError("Undefined function");
   }
 }
