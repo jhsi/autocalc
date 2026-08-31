@@ -3,7 +3,7 @@
 declare const __html__: string;
 
 import { ComputationEngine } from "../core/engine.ts";
-import { errorLabel, isComputeError, type ComputeErrorKind } from "../core/errors.ts";
+import { ComputeError, errorLabel, isComputeError, type ComputeErrorKind } from "../core/errors.ts";
 import { evaluateFormula } from "../core/evaluator.ts";
 import { formatValue } from "../core/formatter.ts";
 import type { CellFormat } from "../core/types.ts";
@@ -292,12 +292,14 @@ function postSelection(): void {
   let formatted = node.characters;
   let error = false;
   let errorKind: ComputeErrorKind | undefined;
+  let errorMessage: string | undefined;
   if (managed) {
     const result = engine.getValue(cell.id);
     if (isComputeError(result)) {
       formatted = errorLabel(result);
       error = true;
       errorKind = result.kind;
+      errorMessage = uiErrorText(result);
     } else {
       formatted = formatValue(result, cell.format);
     }
@@ -327,6 +329,7 @@ function postSelection(): void {
       formatted,
       error,
       errorKind,
+      errorMessage,
     },
   });
 }
@@ -340,12 +343,13 @@ async function postPreview(msg: {
   silent?: boolean;
   revealError?: boolean;
 }): Promise<void> {
-  const { formatted, error, kind } = computePreview(msg);
+  const { formatted, error, kind, message } = computePreview(msg);
   figma.ui.postMessage({
     type: "preview",
     formatted,
     error,
     errorKind: kind,
+    errorMessage: message,
     revealError: Boolean(msg.revealError),
   });
   if (shouldPersistPreview(msg, error, kind)) {
@@ -360,7 +364,7 @@ function computePreview(msg: {
   formula: string;
   rawValue: string;
   format: CellFormat | null;
-}): { formatted: string; error: boolean; kind?: ComputeErrorKind } {
+}): { formatted: string; error: boolean; kind?: ComputeErrorKind; message?: string } {
   const adapter = new FigmaDocumentAdapter();
   const format = msg.format ?? undefined;
   const formula = normalizeFormula(msg.formula);
@@ -369,14 +373,44 @@ function computePreview(msg: {
       ? evaluateFormula(formula, adapter)
       : parseLiteralInput(msg.rawValue);
     if (isComputeError(result)) {
-      return { formatted: errorLabel(result), error: true, kind: result.kind };
+      return {
+        formatted: errorLabel(result),
+        error: true,
+        kind: result.kind,
+        message: uiErrorText(result),
+      };
     }
     return { formatted: formatValue(result, format), error: false };
   } catch (error) {
     if (isComputeError(error)) {
-      return { formatted: errorLabel(error), error: true, kind: error.kind };
+      return {
+        formatted: errorLabel(error),
+        error: true,
+        kind: error.kind,
+        message: uiErrorText(error),
+      };
     }
     throw error;
+  }
+}
+
+function uiErrorText(error: ComputeError): string {
+  switch (error.kind) {
+    case "REF":
+      return error.cellId ? `Unknown reference "${error.cellId}"` : "Unknown reference";
+    case "CYCLE":
+      return "Circular reference";
+    case "PARSE": {
+      const expected = error.message.match(/Expected '([^']+)'/);
+      if (expected?.[1]) {
+        return `Expected "${expected[1]}"`;
+      }
+      return error.message.replace(/\.$/, "");
+    }
+    case "DIV_ZERO":
+      return "Division by zero";
+    default:
+      return error.message;
   }
 }
 

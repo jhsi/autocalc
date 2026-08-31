@@ -20,10 +20,10 @@
         overflow: hidden;
       }
       .wrap {
-        padding: 12px 16px 16px 16px;
+        padding: 12px 16px 12px;
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 10px;
       }
       .muted {
         color: var(--figma-color-text-secondary);
@@ -32,7 +32,7 @@
       .field {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
         font-weight: 400;
       }
       .expr-head {
@@ -40,7 +40,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        min-height: 18px;
+        min-height: 16px;
       }
       .expr-label {
         font-weight: 400;
@@ -67,10 +67,11 @@
         outline-offset: 1px;
       }
       .formula-box {
-        min-height: 88px;
-        padding: 8px 10px;
+        min-height: 100px;
+        height: auto;
+        padding: 6px 8px;
         border: 1px solid var(--figma-color-border);
-        border-radius: 8px;
+        border-radius: 6px;
         background: var(--figma-color-bg-secondary);
         display: flex;
         flex-wrap: wrap;
@@ -80,6 +81,9 @@
         cursor: text;
         width: 100%;
       }
+      .formula-box:hover:not(:focus-within):not(.is-picking) {
+        border-color: var(--figma-color-border-strong, var(--figma-color-border));
+      }
       .clear-expr {
         height: auto;
         padding: 0 2px 0 0;
@@ -87,20 +91,23 @@
         border-radius: 0;
         background: transparent;
         color: var(--figma-color-text-secondary);
-        font-size: 12px;
-        font-weight: 500;
+        font-size: 11px;
+        font-weight: 400;
         line-height: 1.4;
         flex-shrink: 0;
+        opacity: 0.72;
       }
       .clear-expr:hover {
         background: transparent;
         color: var(--figma-color-text);
+        opacity: 1;
         text-decoration: underline;
       }
       .formula-box:focus-within,
       .formula-box.is-picking {
         outline: 2px solid var(--figma-color-border-brand);
-        outline-offset: 1px;
+        outline-offset: 0;
+        border-color: var(--figma-color-border-brand);
       }
       .formula-box.is-formula {
         border-color: var(--figma-color-border-brand);
@@ -114,22 +121,29 @@
       }
       .equals {
         font-weight: 700;
-        font-size: 14px;
-        line-height: 24px;
+        font-size: 13px;
+        line-height: 22px;
         color: var(--figma-color-bg-brand);
-        padding: 0 2px 0 2px;
+        padding: 0 4px 0 2px;
         cursor: text;
+        flex-shrink: 0;
       }
       #formulaTokens {
         display: contents;
+      }
+      .token-run {
+        display: inline-flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        max-width: 100%;
       }
       .tag {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        height: 24px;
-        padding: 0 4px 0 8px;
-        border-radius: 6px;
+        height: 22px;
+        padding: 0 3px 0 7px;
+        border-radius: 5px;
         background: var(--figma-color-bg-brand);
         color: var(--figma-color-text-onbrand);
         font-weight: 600;
@@ -141,15 +155,15 @@
         pointer-events: none;
       }
       .tag-remove {
-        height: 18px;
-        width: 18px;
-        min-width: 18px;
+        height: 16px;
+        width: 16px;
+        min-width: 16px;
         padding: 0;
         border: 0;
         border-radius: 4px;
         background: transparent;
         color: inherit;
-        font-size: 14px;
+        font-size: 13px;
         line-height: 1;
         cursor: pointer;
         flex-shrink: 0;
@@ -158,21 +172,21 @@
         background: rgba(255, 255, 255, 0.2);
       }
       .op {
-        color: var(--figma-color-text-secondary);
-        font-weight: 600;
-        font-size: 13px;
-        line-height: 24px;
-        padding: 0 4px;
+        color: var(--figma-color-text-tertiary, var(--figma-color-text-secondary));
+        font-weight: 500;
+        font-size: 12px;
+        line-height: 22px;
+        padding: 0 3px;
         cursor: text;
         user-select: none;
-        border-radius: 4px;
+        border-radius: 3px;
       }
       .op:hover {
         background: var(--figma-color-bg-tertiary, rgba(0, 0, 0, 0.06));
       }
       .slot {
-        width: 10px;
-        min-height: 24px;
+        width: 8px;
+        min-height: 22px;
         flex-shrink: 0;
         cursor: text;
         border-radius: 2px;
@@ -183,44 +197,36 @@
         opacity: 0.28;
       }
       #exprDraft {
-        flex: 1 1 80px;
-        min-width: 80px;
-        height: 24px;
-        padding: 0;
+        flex: 1 1 64px;
+        min-width: 48px;
+        height: 22px;
+        padding: 0 2px;
         border: 0;
         background: transparent;
         outline: none;
         box-shadow: none;
         font-size: 12px;
+        caret-color: var(--figma-color-text);
       }
       #exprDraft.is-mid {
-        flex: 0 0 auto;
-        min-width: 2px;
-        width: 2px;
-        min-height: 18px;
-        margin: 3px 2px 0;
-        background: var(--figma-color-bg-brand);
-        border-radius: 1px;
-        caret-color: transparent;
+        flex: 0 1 auto;
+        min-width: 8px;
+        width: 8px;
+        caret-color: var(--figma-color-text);
+        background: transparent;
       }
       #exprDraft.is-mid:not(:placeholder-shown) {
         min-width: 24px;
         width: auto;
-        height: 24px;
-        margin: 0 2px;
-        background: transparent;
-        caret-color: var(--figma-color-text);
+      }
+      #exprDraft::placeholder {
+        color: var(--figma-color-text-tertiary, var(--figma-color-text-secondary));
+        opacity: 0.85;
       }
       .format-row {
         display: grid;
         grid-template-columns: 2fr 1fr;
         gap: 8px;
-        margin-top: 4px;
-      }
-      #fractionDigits.is-auto,
-      #fractionDigits:placeholder-shown {
-        opacity: 0.55;
-        color: var(--figma-color-text-secondary);
       }
       button {
         height: 32px;
@@ -232,33 +238,59 @@
       }
       .expr-error {
         font-weight: 400;
-        font-size: 10px;
-        color: var(--figma-color-text-danger);
+        font-size: 11px;
+        line-height: 1.35;
+        color: var(--figma-color-text-danger, #f24822);
+        padding: 0 1px;
       }
       .more {
-        padding-top: 0;
+        margin: 0;
       }
       .more summary {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        margin: 0;
+        padding: 4px 2px;
         cursor: pointer;
         color: var(--figma-color-text-secondary);
         font-size: 12px;
         font-weight: 400;
         list-style: none;
+        border-radius: 4px;
+        user-select: none;
       }
       .more summary::-webkit-details-marker {
         display: none;
       }
-      .more summary::before {
-        content: "▸ ";
+      .more summary:hover {
+        color: var(--figma-color-text);
       }
-      .more[open] summary::before {
-        content: "▾ ";
+      .more .chevron {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        border-radius: 3px;
+        font-size: 11px;
+        line-height: 1;
+        transform: rotate(0deg);
+        transition: transform 0.12s ease, background 0.12s ease;
+      }
+      .more summary:hover .chevron {
+        background: var(--figma-color-bg-hover, var(--figma-color-bg-tertiary, rgba(255, 255, 255, 0.08)));
+      }
+      .more[open] .chevron {
+        transform: rotate(90deg);
       }
       .more .stack {
         display: flex;
         flex-direction: column;
         gap: 8px;
-        margin-top: 8px;
+        margin-top: 6px;
       }
       .empty {
         padding: 32px 16px 24px;
@@ -315,7 +347,7 @@
         <div class="formula-box" id="exprBox">
           <span id="equalsMark" class="equals" hidden>=</span>
           <div id="formulaTokens"></div>
-          <input id="exprDraft" placeholder="1234.56 or = to start a formula" spellcheck="false" />
+          <input id="exprDraft" placeholder="Type a value or select layers…" spellcheck="false" />
         </div>
         <span class="expr-error" id="exprError" hidden></span>
       </div>
@@ -331,17 +363,31 @@
         </label>
         <label>
           Digits
-          <input id="fractionDigits" type="number" min="0" max="8" placeholder="Auto" class="is-auto" />
+          <select id="fractionDigits">
+            <option value="">Auto</option>
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+          </select>
         </label>
       </div>
       <details class="more" id="moreOptions">
-        <summary>Currency &amp; Locale</summary>
+        <summary>
+          <span class="chevron" aria-hidden="true">›</span>
+          Locale &amp; formatting
+        </summary>
         <div class="stack">
-          <label>
+          <label id="currencyField">
             Currency
             <select id="currency"></select>
           </label>
-          <label>
+          <label id="localeField">
             Locale
             <select id="locale"></select>
           </label>
@@ -423,6 +469,7 @@
       const currency = document.getElementById("currency");
       const locale = document.getElementById("locale");
       const moreOptions = document.getElementById("moreOptions");
+      const currencyField = document.getElementById("currencyField");
 
       let formulaParts = [];
       let caretIndex = 0;
@@ -492,6 +539,13 @@
 
       function isBinaryOpPart(part) {
         return Boolean(part && part.kind === "text" && /^[+\-*/,]$/.test(part.value));
+      }
+
+      function isOperandPart(part) {
+        if (!part) return false;
+        if (part.kind === "ref") return true;
+        if (isBinaryOpPart(part) || part.value === "," || part.value === ")") return false;
+        return true;
       }
 
       function isValuePart(part) {
@@ -571,13 +625,7 @@
       }
 
       function updatePlaceholder() {
-        if (expressionFilled()) {
-          exprDraft.placeholder = "";
-          return;
-        }
-        exprDraft.placeholder = formulaMode
-          ? "price * qty"
-          : "1234.56 or = to start a formula";
+        exprDraft.placeholder = expressionFilled() ? "" : "Type a value or select layers…";
       }
 
       function updateMode() {
@@ -625,13 +673,31 @@
         const keepFocus = document.activeElement === exprDraft;
         exprDraft.remove();
         formulaTokens.replaceChildren();
-        for (let i = 0; i <= formulaParts.length; i++) {
-          if (i === caretIndex) formulaTokens.append(exprDraft);
-          else formulaTokens.append(makeSlot(i));
-          if (i < formulaParts.length) {
-            const part = formulaParts[i];
-            formulaTokens.append(part.kind === "ref" ? makeTag(part, i) : makeOp(part, i));
+        const emitCaret = (index) => {
+          if (index === caretIndex) formulaTokens.append(exprDraft);
+          else formulaTokens.append(makeSlot(index));
+        };
+        emitCaret(0);
+        let i = 0;
+        while (i < formulaParts.length) {
+          const part = formulaParts[i];
+          const next = formulaParts[i + 1];
+          if (isBinaryOpPart(part) && isOperandPart(next)) {
+            const run = document.createElement("span");
+            run.className = "token-run";
+            run.append(makeOp(part, i));
+            i += 1;
+            if (i === caretIndex) run.append(exprDraft);
+            else run.append(makeSlot(i));
+            run.append(next.kind === "ref" ? makeTag(next, i) : makeOp(next, i));
+            formulaTokens.append(run);
+            i += 1;
+            emitCaret(i);
+            continue;
           }
+          formulaTokens.append(part.kind === "ref" ? makeTag(part, i) : makeOp(part, i));
+          i += 1;
+          emitCaret(i);
         }
         updateMode();
         if (keepFocus) exprDraft.focus();
@@ -788,10 +854,6 @@
         select.value = value;
       }
 
-      function syncFractionLook() {
-        fractionDigits.classList.toggle("is-auto", fractionDigits.value === "");
-      }
-
       function currentFormat() {
         const format = {
           kind: kind.value || "number",
@@ -800,6 +862,10 @@
         if (fractionDigits.value !== "") format.fractionDigits = Number(fractionDigits.value);
         if (format.kind === "currency") format.currency = currency.value || "USD";
         return format;
+      }
+
+      function syncAdvancedFormatFields() {
+        currencyField.hidden = kind.value !== "currency";
       }
 
       function payload(extra = {}) {
@@ -887,7 +953,14 @@
         ensureSelectValue(currency, format?.currency ?? "USD");
         fractionDigits.value =
           format?.fractionDigits === undefined ? "" : String(format.fractionDigits);
-        syncFractionLook();
+        syncAdvancedFormatFields();
+      }
+
+      function friendlyError(msg) {
+        if (msg.errorMessage) return msg.errorMessage;
+        if (msg.errorKind === "CYCLE") return "Circular reference";
+        if (msg.errorKind === "REF") return "Unknown reference";
+        return msg.formatted || msg.message || "Invalid formula";
       }
 
       function showFormulaError(text) {
@@ -917,7 +990,7 @@
         if (!msg) return;
         if (msg.type === "error") {
           disarmClearUndo();
-          showFormulaError(msg.message);
+          showFormulaError(friendlyError(msg));
           return;
         }
         if (msg.type === "clear-undone") {
@@ -927,7 +1000,7 @@
         if (msg.type === "preview") {
           previewError = !!msg.error;
           if (msg.error) {
-            if (msg.revealError) showFormulaError(msg.formatted);
+            if (msg.revealError) showFormulaError(friendlyError(msg));
             else hideFormulaError();
             return;
           }
@@ -979,7 +1052,7 @@
           formulaMode = true;
           exprDraft.value = "";
           renderTokens(msg.cell.formula);
-          if (msg.cell.error) showFormulaError(msg.cell.formatted);
+          if (msg.cell.error) showFormulaError(friendlyError(msg.cell));
         } else {
           exitFormulaMode();
           exprDraft.value = msg.cell.rawValue == null ? "" : String(msg.cell.rawValue);
@@ -1114,11 +1187,12 @@
       });
 
       kind.addEventListener("change", () => {
+        syncAdvancedFormatFields();
+        if (kind.value === "currency") moreOptions.open = true;
         requestPreview({ revealError: false });
         scheduleFormatCommit();
       });
-      fractionDigits.addEventListener("input", () => {
-        syncFractionLook();
+      fractionDigits.addEventListener("change", () => {
         requestPreview({ revealError: false });
         scheduleFormatCommit();
       });
@@ -1145,6 +1219,7 @@
         window.requestAnimationFrame(resizePlugin);
       }).observe(empty);
 
+      syncAdvancedFormatFields();
       post({ type: "ready" });
     </script>
   </body>
