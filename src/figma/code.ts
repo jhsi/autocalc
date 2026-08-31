@@ -10,7 +10,7 @@ import type { CellFormat } from "../core/types.ts";
 import { FigmaDocumentAdapter } from "./adapter.ts";
 import { cellIdFromBadge, hideIdBadges, showIdBadges } from "./badges.ts";
 import { formulaCellIds } from "./formula-refs.ts";
-import { enclosingComponentOrFrame, hideFormulaHints, showFormulaHints } from "./highlight.ts";
+import { enclosingComponentOrFrame, hideFormulaHints, setHintEmphasis, showFormulaHints } from "./highlight.ts";
 import { nearestText } from "./nearest-text.ts";
 import {
   isOverlayName,
@@ -25,6 +25,7 @@ import { setTextCharacters } from "./text.ts";
 type UiMessage =
   | { type: "ready" }
   | { type: "formula-focus"; active: boolean }
+  | { type: "hint-hover"; cellId: string | null }
   | {
       type: "preview";
       cellId: string;
@@ -99,13 +100,17 @@ figma.ui.onmessage = async (msg: UiMessage) => {
         }
         formulaActive = msg.active;
         await syncBadges();
+        if (formulaActive) {
+          highlightForActive(draftFormula);
+        }
+        return;
+      case "hint-hover":
+        setHintEmphasis(msg.cellId);
         return;
       case "preview":
         draftFormula = msg.formula;
         await postPreview(msg);
-        if (!formulaActive) {
-          void highlightForActive(msg.formula);
-        }
+        void highlightForActive(msg.formula);
         return;
       case "apply":
         await applyCell(msg, { silent: Boolean(msg.silent) });
@@ -626,8 +631,6 @@ async function syncBadges(): Promise<void> {
       await hideIdBadges();
       return;
     }
-    await hideFormulaHints();
-    lastHintKey = "";
     const node = activeText() ?? selectedText();
     if (!node) {
       await hideIdBadges();
@@ -653,12 +656,6 @@ async function hintFormulaMembers(
 ): Promise<void> {
   overlayBusy = true;
   try {
-    if (formulaActive) {
-      await hideFormulaHints();
-      lastHintKey = "";
-      return;
-    }
-
     const adapter = new FigmaDocumentAdapter();
     const formula = normalizeFormula(formulaSource);
     const hintKey = `${node.id}:${formula ?? ""}`;

@@ -182,6 +182,9 @@
       .tag-remove:hover {
         background: rgba(255, 255, 255, 0.2);
       }
+      .tag:hover {
+        filter: brightness(1.06);
+      }
       .op {
         color: var(--figma-color-text-tertiary, var(--figma-color-text-secondary));
         font-weight: 500;
@@ -790,6 +793,12 @@
           event.preventDefault();
           event.stopPropagation();
           setCaret(index + 1);
+        });
+        tag.addEventListener("mouseenter", () => {
+          post({ type: "hint-hover", cellId: part.value });
+        });
+        tag.addEventListener("mouseleave", () => {
+          post({ type: "hint-hover", cellId: null });
         });
         tag.append(remove);
         return tag;

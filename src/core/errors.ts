@@ -5,7 +5,7 @@ import type { CellId } from "./types.ts";
  * The engine should return these as values (spreadsheet-style), not as thrown
  * exceptions, except for NotImplementedError during scaffolding.
  *
- * Display strings like #REF! belong to a UI layer. Use errorLabel() only when
+ * Display strings like ❌ REF! belong to a UI layer. Use errorLabel() only when
  * you need a default human-readable code.
  */
 export type ComputeErrorKind =
@@ -68,17 +68,17 @@ export function nameError(fnName: string): ComputeError {
 export function errorLabel(error: ComputeError): string {
   switch (error.kind) {
     case "REF":
-      return "#REF!";
+      return "❌ REF!";
     case "VALUE":
-      return "#VALUE!";
+      return "❌ VALUE!";
     case "DIV_ZERO":
-      return "#DIV/0!";
+      return "❌ DIV/0!";
     case "CYCLE":
-      return "#CYCLE!";
+      return "❌ CYCLE!";
     case "PARSE":
-      return "#ERROR!";
+      return "❌ ERROR!";
     case "NAME":
-      return "#NAME!";
+      return "❌ NAME!";
   }
 }
 

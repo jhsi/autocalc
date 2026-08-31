@@ -121,6 +121,17 @@ export async function hideFormulaHints(): Promise<void> {
   }
 }
 
+/** Solid outline for the hovered pill’s node; others stay dashed. */
+export function setHintEmphasis(cellId: string | null): void {
+  for (const hint of hints) {
+    if (hint.removed || hint.type !== "RECTANGLE") {
+      continue;
+    }
+    const id = hint.getPluginData(HINT_KEY);
+    hint.dashPattern = cellId && id === cellId ? [] : [5, 4];
+  }
+}
+
 async function loadHintFont(): Promise<FontName | undefined> {
   const candidates: FontName[] = [
     { family: "Inter", style: "Regular" },
