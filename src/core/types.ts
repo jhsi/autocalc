@@ -28,9 +28,12 @@ export interface CellFormat {
   locale?: string;
   /** ISO 4217 code used when kind is "currency". Default "USD". */
   currency?: string;
-  /** Fraction digits to display, when the kind supports it. */
+  /** Fraction digits to display, when the kind supports it. Capped at `MAX_FRACTION_DIGITS`. */
   fractionDigits?: number;
 }
+
+/** Highest fraction-digit precision the formatter and plugin UI accept. */
+export const MAX_FRACTION_DIGITS = 5;
 
 export interface Cell {
   id: CellId;

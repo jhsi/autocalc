@@ -72,6 +72,16 @@ describe("Figma pluginData", () => {
     expect(isGenericLayerId("c100")).toBe(true);
   });
 
+  it("clamps stored fraction digits to 5", () => {
+    const stored = parseStoredCell(
+      serializeStoredCell({
+        cellId: "n",
+        format: { kind: "number", fractionDigits: 8 },
+      }),
+    );
+    expect(stored?.format?.fractionDigits).toBe(5);
+  });
+
   it("treats hint overlays as overlay nodes", () => {
     const hint = { getPluginData: (key: string) => (key === "hint" ? "price" : "") };
     const cell = { getPluginData: () => "" };

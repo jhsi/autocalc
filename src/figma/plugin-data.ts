@@ -1,4 +1,4 @@
-import type { CellFormat, CellFormatKind, CellValue } from "../core/types.ts";
+import { MAX_FRACTION_DIGITS, type CellFormat, type CellFormatKind, type CellValue } from "../core/types.ts";
 
 /** pluginData key on TextNode. Stored as JSON. */
 export const PLUGIN_DATA_KEY = "cell";
@@ -139,7 +139,7 @@ export function parseStoredCell(raw: string): StoredCell | undefined {
       stored.rawValue = data.rawValue;
     }
     if (isCellFormat(data.format)) {
-      stored.format = data.format;
+      stored.format = clampFormatDigits(data.format);
     }
     return stored;
   } catch {
@@ -225,6 +225,19 @@ function isCellValue(value: unknown): value is CellValue {
     typeof value === "string" ||
     typeof value === "boolean"
   );
+}
+
+function clampFormatDigits(format: CellFormat): CellFormat {
+  if (format.fractionDigits === undefined) {
+    return format;
+  }
+  return {
+    ...format,
+    fractionDigits: Math.min(
+      MAX_FRACTION_DIGITS,
+      Math.max(0, format.fractionDigits),
+    ),
+  };
 }
 
 function isCellFormat(value: unknown): value is CellFormat {

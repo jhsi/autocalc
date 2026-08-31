@@ -11,6 +11,16 @@ describe("Milestone 9 — formatting", () => {
     );
   });
 
+  it("caps fraction digits at 5", () => {
+    expect(
+      formatValue(1.123456789, {
+        kind: "number",
+        locale: "en-US",
+        fractionDigits: 8,
+      }),
+    ).toBe("1.12346");
+  });
+
   it("formats currency, rounding to the requested fraction digits", () => {
     expect(
       formatValue(1234.56, {

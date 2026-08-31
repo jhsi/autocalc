@@ -1,4 +1,4 @@
-import type { CellFormat, CellValue } from "./types.ts";
+import { MAX_FRACTION_DIGITS, type CellFormat, type CellValue } from "./types.ts";
 
 const DEFAULT_LOCALE = "en-US";
 const DEFAULT_CURRENCY = "USD";
@@ -95,11 +95,18 @@ export function formatValue(value: CellValue, format?: CellFormat): string {
     kind: format?.kind ?? "number",
     locale: format?.locale ?? DEFAULT_LOCALE,
     currency: format?.currency ?? DEFAULT_CURRENCY,
-    fractionDigits: format?.fractionDigits,
+    fractionDigits: clampFractionDigits(format?.fractionDigits),
   };
 
   const formatted = tryIntlFormat(value, resolved);
   return formatted ?? formatFallback(value, resolved);
+}
+
+function clampFractionDigits(digits: number | undefined): number | undefined {
+  if (digits === undefined || !Number.isFinite(digits)) {
+    return undefined;
+  }
+  return Math.min(MAX_FRACTION_DIGITS, Math.max(0, Math.round(digits)));
 }
 
 function tryIntlFormat(value: number, format: CellFormat): string | undefined {
